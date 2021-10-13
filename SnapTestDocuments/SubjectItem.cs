@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace SnapTestDocuemnts
+namespace SnapTestDocuments
 {
 
     internal class SubDisposable<T> : IDisposable
@@ -10,7 +10,7 @@ namespace SnapTestDocuemnts
         private readonly List<IObserver<T>> viewers;
         private readonly IObserver<T> view;
 
-        public SubDisposable(IObserver<T> observer, List<IObserver<T>> observers) 
+        public SubDisposable(IObserver<T> observer, List<IObserver<T>> observers)
         {
             viewers = observers;
             view = observer;
@@ -26,9 +26,9 @@ namespace SnapTestDocuemnts
 
 
 
-                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-                // TODO: set large fields to null
-                disposedValue = true;
+                    // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                    // TODO: set large fields to null
+                    disposedValue = true;
                 }
             }
         }
@@ -54,7 +54,7 @@ namespace SnapTestDocuemnts
 
         void IObserver<T>.OnCompleted()
         {
-            foreach(var observer in observers)
+            foreach (var observer in observers)
             {
                 observer.OnCompleted();
             }
@@ -62,12 +62,12 @@ namespace SnapTestDocuemnts
 
         void IObserver<T>.OnError(Exception error)
         {
-            foreach(var observer in observers) { observer.OnError(error); }
+            foreach (var observer in observers) { observer.OnError(error); }
         }
 
         void IObserver<T>.OnNext(T value)
         {
-            foreach(var observer in observers  ) { observer.OnNext(value); }
+            foreach (var observer in observers) { observer.OnNext(value); }
         }
 
         IDisposable IObservable<T>.Subscribe(IObserver<T> obs)

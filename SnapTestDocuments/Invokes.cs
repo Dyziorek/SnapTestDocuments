@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace SnapTestDocuemnts
+namespace SnapTestDocuments
 {
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT

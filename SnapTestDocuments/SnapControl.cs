@@ -9,11 +9,12 @@ using System.Xml.Linq;
 
 namespace SnapTestDocuments
 {
-    public partial class SnapControl : Form
+    public partial class SnapControlForm : Form
     {
         private MemoryStream memoryStream;
+        private SnapContextImpl context;
 
-        public SnapControl()
+        public SnapControlForm()
         {
             InitializeComponent();
         }
@@ -31,7 +32,7 @@ namespace SnapTestDocuments
                 }
 
                 String basePath = System.IO.Path.GetDirectoryName(openFileDialog1.FileName) + "\\" + System.IO.Path.GetFileNameWithoutExtension(openFileDialog1.FileName);
-                if (!String.IsNullOrEmpty(basePath ))
+                if (!String.IsNullOrEmpty(basePath))
                 {
                     if (System.IO.File.Exists(basePath + ".rtf"))
                     {
@@ -40,9 +41,16 @@ namespace SnapTestDocuments
                 }
 
                 textBox1.Text = openFileDialog1.FileName;
-                
+
                 snapControl1.LoadDocument(textBox1.Text);
                 snapControl1.Options.Bookmarks.Visibility = DevExpress.XtraRichEdit.RichEditBookmarkVisibility.Visible;
+                if (context == null)
+                {
+                    context = new SnapContextImpl();
+                    snapControl1.SetContext = context;
+                    context.WorkControl = snapControl1;
+                    IDragonAccessManager accMgr = context.GetManager<IDragonAccessManager>();
+                }
             }
 
             XDocument snDocument = GetDocumentFromPackage(memoryStream);
@@ -60,7 +68,7 @@ namespace SnapTestDocuments
             {
                 using (Package zipPack = Package.Open(memoryStr))
                 {
-                      return XDocument.Load(zipPack.GetParts().Where(partCheck => partCheck.Uri.OriginalString.Contains("document")).First().GetStream());
+                    return XDocument.Load(zipPack.GetParts().Where(partCheck => partCheck.Uri.OriginalString.Contains("document")).First().GetStream());
                 }
             }
 
@@ -70,7 +78,7 @@ namespace SnapTestDocuments
         private void BtnSaveDoc_Click(object sender, EventArgs e)
         {
             snapControl1.SaveDocumentAs();
-            
+
         }
 
         private void BtnDocSetup_Click(object sender, EventArgs e)
@@ -95,11 +103,11 @@ namespace SnapTestDocuments
             string clipText = (string)Clipboard.GetData(DataFormats.Text);
             if (clipText?.Length > 0 && clipText.First().Equals('[') && clipText.Last().Equals(']'))
             {
-                clipText = clipText.Trim('[',']');
-                var textNumbers = clipText.Split(' ',',');
+                clipText = clipText.Trim('[', ']');
+                var textNumbers = clipText.Split(' ', ',');
                 List<byte> bytesArr = new List<byte>();
-                
-                foreach(var textPart in textNumbers)
+
+                foreach (var textPart in textNumbers)
                 {
                     if (textPart.Length > 0)
                     {
@@ -117,7 +125,7 @@ namespace SnapTestDocuments
                     snapControl1.LoadDocument(memStr);
                 }
 
-                
+
             }
         }
     }

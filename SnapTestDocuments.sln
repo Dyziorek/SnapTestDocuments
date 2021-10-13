@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29230.47
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapTestDocuments", "SnapTestDocuemnts\SnapTestDocuments.csproj", "{DCDD6096-FBEE-463A-92DD-8F4407683F2E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SnapTestDocuments", "SnapTestDocuments\SnapTestDocuments.csproj", "{DCDD6096-FBEE-463A-92DD-8F4407683F2E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

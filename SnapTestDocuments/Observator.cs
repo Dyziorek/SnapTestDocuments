@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace SnapTestDocuemnts
+namespace SnapTestDocuments
 {
     internal class Observator<T> : IObserver<T>
     {

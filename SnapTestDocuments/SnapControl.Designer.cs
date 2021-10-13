@@ -1,8 +1,7 @@
-﻿using SnapTestDocuemnts;
-
+﻿
 namespace SnapTestDocuments
 {
-    partial class SnapControl
+    partial class SnapControlForm
     {
         /// <summary>
         /// Required designer variable.
@@ -31,7 +30,7 @@ namespace SnapTestDocuments
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SnapControl));
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SnapControlForm));
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.bntOpen = new System.Windows.Forms.Button();
             this.textBox1 = new SnapTestDocuemnts.ExtTextControl();

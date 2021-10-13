@@ -1,7 +1,7 @@
 ﻿using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace SnapTestDocuemnts
+namespace SnapTestDocuments
 {
 
     class ExtTextControl : TextBox
