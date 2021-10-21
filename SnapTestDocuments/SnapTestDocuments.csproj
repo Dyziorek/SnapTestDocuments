@@ -94,20 +94,23 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DragonAccessManagerImpl.cs" />
+    <Compile Include="DragonAccessManagerCmn.cs" />
     <Compile Include="ExtSnapControl.cs">
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="ExtTextControl.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="ExtTxTextControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Invokes.cs" />
     <Compile Include="Observator.cs" />
-    <Compile Include="SnapControl.cs">
+    <Compile Include="SnapControlForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="SnapControl.Designer.cs">
-      <DependentUpon>SnapControl.cs</DependentUpon>
+    <Compile Include="SnapControlForm.Designer.cs">
+      <DependentUpon>SnapControlForm.cs</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -124,8 +127,8 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
-    <EmbeddedResource Include="SnapControl.resx">
-      <DependentUpon>SnapControl.cs</DependentUpon>
+    <EmbeddedResource Include="SnapControlForm.resx">
+      <DependentUpon>SnapControlForm.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="log4net.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

@@ -72,7 +72,7 @@ namespace SnapTestDocuments
                 case 194:  // EM_REPLACESEL,  replace text in place of current selection given in pair lastselectionPair, also if no selection simply dictates new text.
                     if (log.IsDebugEnabled)
                     {
-                        log.Debug(string.Format("Replace selected text: {0}, Undo: {1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
+                        log.Debug(string.Format("Replace selected text: '{0}', Undo: {1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
                     }
 
                     string messageText = Marshal.PtrToStringAuto(m.LParam);
@@ -235,22 +235,32 @@ namespace SnapTestDocuments
                     }
                     break;
                 case 0xd6: //EM_POSFROMCHAR
+                    m.Result = (IntPtr)(-1);
                     if ((int)m.WParam >= 0)
                     {
                         System.Drawing.Rectangle rectObj = new System.Drawing.Rectangle();
                         if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                         {
                             rectObj = _currentContext.GetManager<IDragonAccessManager>().PosFromChar((int)m.WParam);
+                            m.Result = (IntPtr)(Convert.ToInt16(rectObj.X) + (Convert.ToInt16(rectObj.Y) << 16));
                         }
                         else
                         {
-                            rectObj = GetBoundsFromPosition(Document.CreatePosition((int)m.WParam));
+                            if (Document.Range.Length > (int)m.WParam)
+                            {
+                                var docCharPos = Document.CreateRange(Document.Range.Start, (int)m.WParam);
+                                rectObj = GetBoundsFromPosition(docCharPos.End);
+                                m.Result = (IntPtr)(Convert.ToInt16(rectObj.X) + (Convert.ToInt16(rectObj.Y) << 16));
+                            }
+                            else
+                            {
+                                m.Result = (IntPtr)(-1);
+                            }
                         }
                         if (log.IsDebugEnabled)
                         {
                             log.Debug(string.Format("Position  C:{0},X:{1},Y:{2}", (int)m.WParam, rectObj.X, rectObj.Y));
                         }
-                        m.Result = (IntPtr)(Convert.ToInt16(rectObj.X) + (Convert.ToInt16(rectObj.Y) << 16));
                         log.Debug("Pos From Char Message processed: " + m.ToString());
                     }
                     break;
@@ -295,7 +305,7 @@ namespace SnapTestDocuments
                         log.Debug(string.Format("Read text Length:'{0}'", (int)(m.Result)));
                         break;
                     case 0xc2:
-                        log.Debug(string.Format("Replace selected text: {0}, Undo:{1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
+                        log.Debug(string.Format("Replace selected text: '{0}', Undo:{1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
                         break;
                     case 0xb0:
                         log.Debug(string.Format("Get Selection: from:{0}, to:{1} - ret:{2:X}", Marshal.ReadInt16(m.WParam), Marshal.ReadInt16(m.LParam), (int)m.Result));

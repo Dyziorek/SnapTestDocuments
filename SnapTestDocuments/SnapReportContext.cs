@@ -1,13 +1,21 @@
 ﻿using DevExpress.Snap;
 using DevExpress.XtraRichEdit.API.Native;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 
 namespace SnapTestDocuments
 {
-    public enum DocumentEntityBase
+
+    public enum DocumentEntityTypes
     {
-        IntepretationSection
+        InterpretationSection
+    }
+
+    public class DocumentEntityBase
+    {
+        public string name;
+        public DocumentEntityTypes Type;
     }
 
     public interface ITextEditManager
@@ -26,6 +34,7 @@ namespace SnapTestDocuments
     public interface ISnapCtrlContext : ISnapReportContext
     {
         DevExpress.Snap.SnapControl SnapControl { get; }
+        DevExpress.Snap.Core.API.SnapDocument SnapDocument { get; }
     }
 
     public interface ISnapReportContext
@@ -61,6 +70,7 @@ namespace SnapTestDocuments
 
     public class SectionManagerImpl : IInterpSectionsManager
     {
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
         private Field sectionField;
         private SnapControl documentControl;
 
@@ -76,19 +86,23 @@ namespace SnapTestDocuments
 
         public Field GetSectionField(DocumentEntityBase sectionEntity)
         {
-            if (sectionEntity == DocumentEntityBase.IntepretationSection)
+            log.Debug("Field Section lookup");
+            if (sectionEntity?.Type == DocumentEntityTypes.InterpretationSection)
             {
                 foreach (Field checkingField in documentControl.Document.Fields)
                 {
                     var fieldCodeText = documentControl.Document.GetText(checkingField.CodeRange);
-                    if (fieldCodeText.Contains("INTERP"))
+                    if (fieldCodeText.Contains("FUNCTION") && fieldCodeText.Contains(sectionEntity.name))
                     {
+                        log.Debug("Field Section lookup found:" + sectionEntity.name);
                         return checkingField;
                     }
                 }
             }
             return null;
         }
+
+
 
         public void Init()
         {
@@ -109,34 +123,119 @@ namespace SnapTestDocuments
         }
     }
 
-
-
-    public class SnapContextImpl : ISnapReportContext
+    public class SnapMangerContainer<T> where T : class
     {
-        DragonAccessManagerImpl dragonWork = null;
+        private Dictionary<Type, T> items = new Dictionary<Type, T>();
+        public P Get<P>() where P : T
+        {
+            return items.TryGetValue(typeof(P), out T ret) ? (P)ret : default(P);
+        }
+
+        public void Set<P>(P newEntry) where P : T
+        {
+            if(!items.ContainsKey(typeof(P)))
+            {
+                items.Add(typeof(P), newEntry);
+            }
+        }
+    }
+
+    public class SnapContextImpl : ISnapCtrlContext
+    {
+        SnapMangerContainer<ITextEditManager> manager = new SnapTestDocuments.SnapMangerContainer<ITextEditManager>();
+        DragonAccessManagerCmn dragonWork = null;
         public DevExpress.Snap.SnapControl WorkControl { get; set; }
+        SectionManagerImpl sectioner = null;
 
 
         public DevExpress.Snap.SnapControl SnapControl => WorkControl;
 
-        T ISnapReportContext.GetManager<T>()
+        public DevExpress.Snap.Core.API.SnapDocument SnapDocument => WorkControl.Document;
+
+        public virtual T GetManager<T>() where T : ITextEditManager
         {
-            if (dragonWork != null)
+            var managedItem = manager.Get<T>();
+            if (managedItem != null)
             {
-                return (T)(ITextEditManager)dragonWork;
-            }
-            else
-            {
-                dragonWork = new DragonAccessManagerImpl(this);
+                return managedItem;
             }
 
-            return (T)(ITextEditManager)null;
+            if (typeof(T) == typeof(IDragonAccessManager))
+            {
+                if (dragonWork == null)
+                {
+                    dragonWork = new DragonAccessManagerCmn(this);
+                    manager.Set((T)(ITextEditManager)dragonWork);
+                    return (T)(ITextEditManager)dragonWork;
+                }
+            }
+
+            if (typeof(T) == typeof(IInterpSectionsManager))
+            {
+                if(sectioner == null)
+                {
+                    sectioner = new SectionManagerImpl(this);
+                    manager.Set((T)(ITextEditManager)sectioner);
+                    return (T)(ITextEditManager)sectioner;
+                }
+            }
+
+
+             return (T)(ITextEditManager)null;
         }
 
-        public DragonAccessManagerImpl getDragon()
+        public DragonAccessManagerCmn getDragon()
         {
             return dragonWork;
         }
     }
 
+    public class SnapDocumentRangeTools
+    {
+        public static bool IsTargetDocumentRangeInBaseDocumentRange(DocumentRange baseRange, DocumentRange targetRange)
+        {
+            if (baseRange == null || targetRange == null) return false;
+
+            int baseRangeStart = baseRange.Start.ToInt();
+            int baseRangeEnd = baseRangeStart + baseRange.Length;
+
+            int targeRangeStart = targetRange.Start.ToInt();
+            int targeRangeEnd = targeRangeStart + targetRange.Length;
+
+            return baseRangeStart <= targeRangeStart && baseRangeEnd >= targeRangeEnd;
+        }
+
+        public static bool IsTargetDocumentPositionInBaseDocumentRange(DocumentRange baseRange, DocumentPosition documentPosition)
+        {
+            if (baseRange == null || documentPosition == null) return false;
+
+            int baseRangeStart = baseRange.Start.ToInt();
+            int baseRangeEnd = baseRangeStart + baseRange.Length;
+
+            return baseRangeStart <= documentPosition.ToInt() && baseRangeEnd >= documentPosition.ToInt();
+        }
+    }
+
+    public class SnapRangePermissionsTools
+    {
+
+        public static bool IsDocumentRangeEditableRange(SubDocument subDocument, DocumentRange docRange)
+        {
+            if (subDocument == null || docRange == null) return false;
+            bool isEditable = false;
+
+            RangePermissionCollection rangesCol = subDocument.BeginUpdateRangePermissions();
+            foreach (RangePermission rangePerm in rangesCol)
+            {
+                if (rangePerm.UserName == "Regular User" && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(rangePerm.Range, docRange))
+                {
+                    isEditable = true;
+                    break;
+                }
+            }
+            subDocument.CancelUpdateRangePermissions(rangesCol);
+
+            return isEditable;
+        }
+    }
 }

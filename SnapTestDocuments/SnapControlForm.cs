@@ -13,7 +13,7 @@ namespace SnapTestDocuments
     {
         private MemoryStream memoryStream;
         private SnapContextImpl context;
-
+        private DocumentEntityBase selectedItem;
         public SnapControlForm()
         {
             InitializeComponent();
@@ -50,6 +50,7 @@ namespace SnapTestDocuments
                     snapControl1.SetContext = context;
                     context.WorkControl = snapControl1;
                     IDragonAccessManager accMgr = context.GetManager<IDragonAccessManager>();
+                    IInterpSectionsManager sectionMgr = context.GetManager<IInterpSectionsManager>();
                 }
             }
 
@@ -127,6 +128,66 @@ namespace SnapTestDocuments
 
 
             }
+        }
+
+        private void btnSection_Click(object sender, EventArgs e)
+        {
+
+            DevExpress.XtraRichEdit.API.Native.DocumentPosition documentPosition = snapControl1.Document.Selection.Start;
+            selectedItem = null;
+            lbSections.Items.Clear();
+            foreach (var fieldInfo in snapControl1.Document.Fields)
+            {
+                var fieldCodeText = snapControl1.Document.GetText(fieldInfo.CodeRange);
+                var fieldCodePar = new string(fieldCodeText.Take(fieldCodeText.IndexOf("_FUNCTION")).Skip(11).ToArray());
+                if (fieldCodeText.Contains("_FUNCTION") &&
+                SnapDocumentRangeTools.IsTargetDocumentPositionInBaseDocumentRange(fieldInfo.Range, documentPosition))
+                {
+                    selectedItem = new DocumentEntityBase
+                    {
+                        name = fieldCodePar,
+                        Type = DocumentEntityTypes.InterpretationSection
+                    };
+                }
+                if (fieldCodeText.Contains("_FUNCTION"))
+                {
+                    lbSections.Items.Add(fieldCodePar);
+                }
+            }
+
+            context.GetManager<IDragonAccessManager>().UpdateSelectedItem(this.selectedItem);
+                
+            IInterpSectionsManager sectionMgr = context.GetManager<IInterpSectionsManager>();
+            var sectionField = sectionMgr.GetSectionField(selectedItem);
+            if (sectionField != null)
+                System.Diagnostics.Debug.WriteLine(snapControl1.Document.GetText(sectionField.CodeRange));
+
+            context.GetManager<IDragonAccessManager>().UpdateSelectedItem(selectedItem);
+        }
+
+        private void lbSections_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var results = lbSections.SelectedItem as string;
+            if (results != null)
+            {
+                foreach (var fieldInfo in snapControl1.Document.Fields)
+                {
+                    var fieldCodeText = snapControl1.Document.GetText(fieldInfo.CodeRange);
+                    if (fieldCodeText.Contains(results))
+                    {
+                        context.SnapDocument.CaretPosition = fieldInfo.ResultRange.End;
+                        context.SnapControl.Focus();
+                        selectedItem = new DocumentEntityBase
+                        {
+                            name = results,
+                            Type = DocumentEntityTypes.InterpretationSection
+                        };
+                        context.GetManager<IDragonAccessManager>().UpdateSelectedItem(this.selectedItem);
+                        break;
+                    }
+                }
+            }
+
         }
     }
 }

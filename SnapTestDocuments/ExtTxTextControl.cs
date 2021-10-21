@@ -1,10 +1,14 @@
-﻿using System.Runtime.InteropServices;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace SnapTestDocuments
 {
-
-    class ExtTextControl : TextBox
+    class ExtTxTextControl : TXTextControl.TextControl
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
 
@@ -38,15 +42,7 @@ namespace SnapTestDocuments
                     log.Debug(string.Format("Get Control Rect {0},{1},{2},{3}", rECTObj.Left, rECTObj.Top, rECTObj.Right, rECTObj.Bottom));
                     break;
                 case 0xd7:
-                    log.Debug(string.Format("CharFromPos loc x,y:{0}, {1} return: x.y:{2},{3} ",  (int)m.LParam & 0x0000FFFF, ((int)m.LParam & 0xFFFF0000) >> 16, (int)m.Result & 0x0000FFFF , ((int)m.Result & 0xFFFF0000) >> 16));
-                    break;
-                case 0xd6: // POSFROMCHAR
-                    if((int)m.Result == -1)
-                    {
-                        log.Debug(string.Format("PosFromChar CharPos :{0} return: -1 ", (int)m.WParam & 0x0000FFFF));
-                    }
-                    else
-                        log.Debug(string.Format("PosFromChar CharPos :{0}  return: values({1:X}) x.y:{2},{3} ", (int)m.WParam & 0x0000FFFF, (int)m.Result, (int)m.Result & 0x0000FFFF, ((int)m.Result & 0xFFFF0000) >> 16));
+                    log.Debug(string.Format("CharFromPos loc x,y:{0} return: x.y:{2}.{1} ", (int)m.LParam, ((int)m.Result & 0xFFFF0000) >> 16, (int)m.Result & 0x0000FFFF));
                     break;
                 default:
                     log.Info("Message: " + m.ToString());

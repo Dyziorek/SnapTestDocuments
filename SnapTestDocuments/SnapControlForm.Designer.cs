@@ -33,15 +33,15 @@ namespace SnapTestDocuments
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(SnapControlForm));
             this.openFileDialog1 = new System.Windows.Forms.OpenFileDialog();
             this.bntOpen = new System.Windows.Forms.Button();
-            this.textBox1 = new SnapTestDocuemnts.ExtTextControl();
+            this.textBox1 = new SnapTestDocuments.ExtTextControl();
             this.label1 = new System.Windows.Forms.Label();
             this.snapDockManager1 = new DevExpress.Snap.Extensions.SnapDockManager(this.components);
-            this.snapControl1 = new SnapTestDocuemnts.ExtSnapControl();
+            this.snapControl1 = new SnapTestDocuments.ExtSnapControl();
             this.btnSaveDoc = new System.Windows.Forms.Button();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.rulerBar1 = new TXTextControl.RulerBar();
-            this.textControl1 = new TXTextControl.TextControl();
+            this.textControl1 = new SnapTestDocuments.ExtTxTextControl();
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.snapDocumentManager1 = new DevExpress.Snap.Extensions.SnapDocumentManager(this.components);
             this.noDocumentsView1 = new DevExpress.XtraBars.Docking2010.Views.NoDocuments.NoDocumentsView(this.components);
@@ -49,6 +49,8 @@ namespace SnapTestDocuments
             this.behaviorManager1 = new DevExpress.Utils.Behaviors.BehaviorManager(this.components);
             this.btnDocSetup = new System.Windows.Forms.Button();
             this.btnPasteText = new System.Windows.Forms.Button();
+            this.btnSection = new System.Windows.Forms.Button();
+            this.lbSections = new System.Windows.Forms.ListBox();
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -231,12 +233,34 @@ namespace SnapTestDocuments
             this.btnPasteText.UseVisualStyleBackColor = true;
             this.btnPasteText.Click += new System.EventHandler(this.btnPasteText_Click);
             // 
-            // SnapControl
+            // btnSection
+            // 
+            this.btnSection.Location = new System.Drawing.Point(936, 75);
+            this.btnSection.Name = "btnSection";
+            this.btnSection.Size = new System.Drawing.Size(75, 23);
+            this.btnSection.TabIndex = 6;
+            this.btnSection.Text = "gosection";
+            this.btnSection.UseVisualStyleBackColor = true;
+            this.btnSection.Click += new System.EventHandler(this.btnSection_Click);
+            // 
+            // lbSections
+            // 
+            this.lbSections.FormattingEnabled = true;
+            this.lbSections.Location = new System.Drawing.Point(1017, 75);
+            this.lbSections.Name = "lbSections";
+            this.lbSections.ScrollAlwaysVisible = true;
+            this.lbSections.Size = new System.Drawing.Size(182, 30);
+            this.lbSections.TabIndex = 8;
+            this.lbSections.SelectedIndexChanged += new System.EventHandler(this.lbSections_SelectedIndexChanged);
+            // 
+            // SnapControlForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1211, 697);
+            this.Controls.Add(this.lbSections);
             this.Controls.Add(this.btnPasteText);
+            this.Controls.Add(this.btnSection);
             this.Controls.Add(this.btnDocSetup);
             this.Controls.Add(this.splitContainer1);
             this.Controls.Add(this.btnSaveDoc);
@@ -244,7 +268,7 @@ namespace SnapTestDocuments
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.bntOpen);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Name = "SnapControl";
+            this.Name = "SnapControlForm";
             this.Text = "SnapTester";
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).EndInit();
             this.splitContainer1.Panel1.ResumeLayout(false);
@@ -282,9 +306,11 @@ namespace SnapTestDocuments
         private DevExpress.Utils.Behaviors.BehaviorManager behaviorManager1;
         private System.Windows.Forms.Button btnDocSetup;
         private System.Windows.Forms.SplitContainer splitContainer2;
-        private TXTextControl.TextControl textControl1;
+        private ExtTxTextControl textControl1;
         private System.Windows.Forms.Button btnPasteText;
         private TXTextControl.RulerBar rulerBar1;
+        private System.Windows.Forms.Button btnSection;
+        private System.Windows.Forms.ListBox lbSections;
     }
 }
 
