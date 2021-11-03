@@ -270,6 +270,7 @@ namespace SnapTestDocuments
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "SnapControlForm";
             this.Text = "SnapTester";
+            this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.SnapControlForm_FormClosed);
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).EndInit();
             this.splitContainer1.Panel1.ResumeLayout(false);
             this.splitContainer1.Panel2.ResumeLayout(false);

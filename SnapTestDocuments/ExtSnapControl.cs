@@ -167,7 +167,7 @@ namespace SnapTestDocuments
                         m.Result = (IntPtr)1;
                     }
 
-                    log.DebugFormat("Updated Selection:  old: {0} new: {1} - result:{2}", lastselectionPair, currentselectionPair, m.Result);
+                    log.InfoFormat("Updated Selection:  old: {0} new: {1} - result:{2}", lastselectionPair, currentselectionPair, m.Result);
                     break;
                 case 135: //WM_GETDLGCODE
                     m.Result = (IntPtr)0x89;

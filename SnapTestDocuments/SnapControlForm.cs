@@ -87,16 +87,18 @@ namespace SnapTestDocuments
             //ShowPageSetupFormCommand cmd = new ShowPageSetupFormCommand(snapControl1);
             //cmd.Execute();
 
-            var doc = snapControl1.Document;
+            //var doc = snapControl1.Document;
 
-            var table = snapControl1.Document.Tables.Create(doc.Range.End, 1, 1);
+            //var table = snapControl1.Document.Tables.Create(doc.Range.End, 1, 1);
 
-            var fieldInfo = doc.Fields.Create(table.Cell(0, 0).ContentRange.Start, "SN EF|MACRO|SlideResultsMacro|SNF");
-            fieldInfo.ShowCodes = false;
-            doc.InsertText(fieldInfo.ResultRange.Start, "Slide Results Macro");
+            //var fieldInfo = doc.Fields.Create(table.Cell(0, 0).ContentRange.Start, "SN EF|MACRO|SlideResultsMacro|SNF");
+            //fieldInfo.ShowCodes = false;
+            //doc.InsertText(fieldInfo.ResultRange.Start, "Slide Results Macro");
 
             //DevExpress.XtraRichEdit.Commands.ToggleShowWhitespaceCommand too = new ToggleShowWhitespaceCommand(snapControl1);
             //too.Execute();
+
+            
         }
 
         private void btnPasteText_Click(object sender, EventArgs e)
@@ -188,6 +190,19 @@ namespace SnapTestDocuments
                 }
             }
 
+        }
+
+        private void SnapControlForm_FormClosed(object sender, FormClosedEventArgs e)
+        {
+            var appenders = log4net.LogManager.GetRepository().GetAppenders();
+            foreach (var app in appenders)
+            {
+                if (app is log4net.Appender.BufferingForwardingAppender)
+                {
+                    log4net.Appender.BufferingForwardingAppender check = app as log4net.Appender.BufferingForwardingAppender;
+                    check.Flush();
+                }
+            }
         }
     }
 }

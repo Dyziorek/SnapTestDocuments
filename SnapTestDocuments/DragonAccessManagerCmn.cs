@@ -1,10 +1,8 @@
 ﻿using DevExpress.XtraRichEdit.API.Native;
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace SnapTestDocuments
 {
@@ -36,31 +34,51 @@ namespace SnapTestDocuments
 
         public Tuple<int, int> GetSel()
         {
-            if (this.currentSelectedInterp != null)
+            lock (this)
             {
-                return lastselectionPair;
+                if (this.currentSelectedInterp != null)
+                {
+                    if (lastselectionPair.Item1 - lastselectionPair.Item2 == 0)
+                    {
+                        var docSelection = this.SnapCtrl.Document.CaretPosition.ToInt();
+
+                        int curPos = docSelection - currentSectionOffset;
+                        if (curPos > 0 && curPos <= currentSectionField.ResultRange.Length)
+                        {
+                            lastselectionPair = new Tuple<int, int>(curPos, curPos);
+                        }
+                    }
+                    log.InfoFormat("[{0}] GetSel returns p:{1}, l:{2}", RuntimeHelpers.GetHashCode(this), lastselectionPair.Item1, lastselectionPair.Item2);
+                    return lastselectionPair;
+                }
+                log.InfoFormat("[{0}]GetSel returns zero p:{1}, l:{2}", RuntimeHelpers.GetHashCode(this), 0, 0);
+                return new Tuple<int, int>(0, 0);
             }
-            log.InfoFormat("GetSel returns zero p:{0}, l:{1}", 0, 0);
-            return new Tuple<int, int>(0, 0);
         }
 
         public string GetText()
         {
-            log.InfoFormat("GetText:'{0}'", cacheStringText);
-            return cacheStringText;
+            lock (this)
+            {
+                log.InfoFormat("[{0}]GetText:'{1}'", RuntimeHelpers.GetHashCode(this), cacheStringText);
+                return cacheStringText;
+            }
         }
 
         public int GetTextLen()
         {
-            log.Debug("GetTextLen:");
-            string textResult = GetText();
-            if (!string.IsNullOrEmpty(textResult))
+            lock (this)
             {
-                log.InfoFormat("TextLen:{0}", textResult.Length);
-                return textResult.Length;
-            }
+                log.Debug("GetTextLen:");
+                string textResult = GetText();
+                if (!string.IsNullOrEmpty(textResult))
+                {
+                    log.InfoFormat("[{0}]TextLen:{1}", RuntimeHelpers.GetHashCode(this), textResult.Length);
+                    return textResult.Length;
+                }
 
-            return 0;
+                return 0;
+            }
         }
 
         public void Init()
@@ -74,19 +92,17 @@ namespace SnapTestDocuments
 
         private void SnapControl_SelectionChanged(object sender, EventArgs e)
         {
-            log.Debug("SnapControl_SelectionChanged:");
+            log.Info("SnapControl_SelectionChanged:");
             if (this.currentSelectedInterp != null)
             {
-                Field sectionField = snapCtrlCtx.GetManager<IInterpSectionsManager>().GetSectionField(currentSelectedInterp);
-                if (sectionField != null)
+                if (currentSectionField != null)
                 {
                     var docSelection = this.SnapCtrl.Document.Selection;
                     int startPos = docSelection.Start.ToInt();
                     int endPos = docSelection.End.ToInt();
 
 
-                    int currentSectionOffset = sectionField.ResultRange.Start.ToInt();
-                    int currentSectionLength = sectionField.ResultRange.Length;
+                    int currentSectionLength = currentSectionField.ResultRange.Length;
 
                     int minPos = Math.Min(startPos - currentSectionOffset, endPos - currentSectionOffset);
                     int maxPos = Math.Max(startPos - currentSectionOffset, endPos - currentSectionOffset);
@@ -101,7 +117,7 @@ namespace SnapTestDocuments
                         maxPos = currentSectionLength - 1;
                     }
 
-                    log.InfoFormat("Current Selection p:{0}, l:{1}", minPos, maxPos - minPos);
+                    log.InfoFormat("[{0}]Current Selection begin:{1}, end:{2}", RuntimeHelpers.GetHashCode(this), minPos, maxPos);
                     lastselectionPair = new Tuple<int, int>(minPos, maxPos);
                 }
                 else
@@ -185,58 +201,60 @@ namespace SnapTestDocuments
         }
         public void ReplaceText(string text)
         {
-            log.DebugFormat("ReplaceText with '{0}'", text);
-            if (!string.IsNullOrEmpty(text))
+            lock (this)
             {
-                if (this.currentSelectedInterp != null)
+                log.DebugFormat("ReplaceText with '{0}'", text);
+                if (!string.IsNullOrEmpty(text))
                 {
-
-                    var selection = this.SnapCtrl.Document.Selection;
-                    if (selection.Start.ToInt() != lastselectionPair.Item1)
+                    if (this.currentSelectedInterp != null)
                     {
-                        log.InfoFormat("Replace Text selected (cached): {0} size:{1}", lastselectionPair.Item1, lastselectionPair.Item2);
-                        log.InfoFormat("Current selection was: {0} size:{1}", selection.Start.ToInt(), selection.Length);
-                        selection = this.SnapCtrl.Document.CreateRange(lastselectionPair.Item1, lastselectionPair.Item2);
-                    }
-                    else
-                    {
-                        log.InfoFormat("Replace Text selected: {0} size:{1}", selection.Start.ToInt(), selection.Length);
-                    }
-                    if (SnapRangePermissionsTools.IsDocumentRangeEditableRange(SnapCtrl.Document, selection))
-                    {
-                        log.InfoFormat("Replace Text:'{0}'", text);
-                        log.InfoFormat("Replacing selected text in place:'{0}'", SnapCtrl.Document.GetText(selection));
-                        
-                        if (currentSectionField != null)
+                        var selection = this.SnapCtrl.Document.Selection;
+                        if (selection.Start.ToInt() - currentSectionOffset != lastselectionPair.Item1)
                         {
-                            int currentSectionOffset = currentSectionField.ResultRange.Start.ToInt() - 1;
-                            if (selection.Start.ToInt() - currentSectionOffset == cacheStringText.Length)
+                            log.InfoFormat("[{0}]Replace Text selected (cached): s:{1} e:{2}", RuntimeHelpers.GetHashCode(this), lastselectionPair.Item1, lastselectionPair.Item2);
+                            log.InfoFormat("[{0}]Current selection was: {1} size:{2}", RuntimeHelpers.GetHashCode(this), selection.Start.ToInt() - currentSectionOffset, selection.Length);
+                            selection = this.SnapCtrl.Document.CreateRange(currentSectionField.ResultRange.Start.ToInt() + lastselectionPair.Item1, lastselectionPair.Item2 - lastselectionPair.Item1);
+                        }
+                        else
+                        {
+                            log.InfoFormat("[{0}]Replace Text selected: {1} size:{2}", RuntimeHelpers.GetHashCode(this), selection.Start.ToInt() - currentSectionOffset, selection.Length);
+                        }
+                        if (SnapRangePermissionsTools.IsDocumentRangeEditableRange(SnapCtrl.Document, selection))
+                        {
+                            log.InfoFormat("[{0}]Replace Text:'{1}'", RuntimeHelpers.GetHashCode(this), text);
+                            log.InfoFormat("[{0}]Replacing selected text in place:'{1}'", RuntimeHelpers.GetHashCode(this), SnapCtrl.Document.GetText(selection));
+
+                            if (currentSectionField != null)
                             {
-                                if (cacheStringText.Length > 0 && !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]) && !Char.IsWhiteSpace(text[0]))
+                                if (selection.Start.ToInt() - currentSectionOffset - 1 == cacheStringText.Length)
                                 {
-                                    log.InfoFormat("Adding space existing text: '{0}', addedText '{1}', lastCharWhiteSpace:{2}, first:{3}", cacheStringText, text, !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]), !Char.IsWhiteSpace(text[0]));
-                                    text = " " + text;
+                                    if (cacheStringText.Length > 0 && !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]) && !Char.IsWhiteSpace(text[0]))
+                                    {
+                                        log.InfoFormat("[{0}]Adding space existing text: '{1}', addedText '{2}', lastCharWhiteSpace:{3}, first:{4}", RuntimeHelpers.GetHashCode(this), cacheStringText, text, !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]), !Char.IsWhiteSpace(text[0]));
+                                        text = " " + text;
+                                    }
                                 }
-                            }
-                            SubDocument docFragment = selection.BeginUpdateDocument();
-                            try
-                            {
-                                this.SnapCtrl.BeginUpdate();
-                                docFragment.Replace(selection, text);
-                            }
-                            finally
-                            {
-                                selection.EndUpdateDocument(docFragment);
-                                this.SnapCtrl.EndUpdate();
-                                cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.ResultRange);
-                                log.InfoFormat("Whole Section Text after replace:'{0}'", cacheStringText);
+                                SubDocument docFragment = selection.BeginUpdateDocument();
+                                try
+                                {
+                                    this.SnapCtrl.BeginUpdate();
+                                    docFragment.Replace(selection, text);
+                                    this.SnapCtrl.Document.CaretPosition = selection.End;
+                                }
+                                finally
+                                {
+                                    selection.EndUpdateDocument(docFragment);
+                                    this.SnapCtrl.EndUpdate();
+                                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.ResultRange);
+                                    log.InfoFormat("[{0}]Whole Section Text after replace:'{1}'", RuntimeHelpers.GetHashCode(this), cacheStringText);
+                                }
                             }
                         }
                     }
-                }
-                else if (currentSelectedInterp == null)
-                {
-                    log.Info("Replace Text: no section selected!");
+                    else if (currentSelectedInterp == null)
+                    {
+                        log.Info("Replace Text: no section selected!");
+                    }
                 }
             }
         }
@@ -248,39 +266,42 @@ namespace SnapTestDocuments
 
         public Tuple<int, int> SetSel(int start, int end)
         {
-            log.DebugFormat("SetSel: {0}, {1}", start, end);
-            if (this.currentSelectedInterp != null)
+            lock (this)
             {
-                if (currentSectionField != null)
+                log.DebugFormat("SetSel: {0}, {1}", start, end);
+                if (this.currentSelectedInterp != null)
                 {
-
-                    int currentSectionLength = currentSectionField.ResultRange.Length;
-
-                    var selection = this.SnapCtrl.Document.Selection;
-                    this.lastselectionPair = new Tuple<int, int>(selection.Start.ToInt(), selection.Length);
-                    int minPos = Math.Min(currentSectionOffset + start, currentSectionOffset + end);
-                    int maxPos = Math.Max(currentSectionOffset + start, currentSectionOffset + end);
-                    if (maxPos == minPos)
+                    if (currentSectionField != null)
                     {
-                        maxPos += 1;
-                        minPos += 1;
+
+                        int currentSectionLength = currentSectionField.ResultRange.Length;
+
+                        var selection = this.SnapCtrl.Document.Selection;
+                        this.lastselectionPair = new Tuple<int, int>(selection.Start.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
+                        int minPos = Math.Min(currentSectionOffset + start, currentSectionOffset + end);
+                        int maxPos = Math.Max(currentSectionOffset + start, currentSectionOffset + end);
+                        if (maxPos == minPos)
+                        {
+                            maxPos += 1;
+                            minPos += 1;
+                        }
+                        if ((maxPos - minPos) > currentSectionLength)
+                        {
+                            minPos = currentSectionOffset;
+                            maxPos = currentSectionOffset + currentSectionLength - 1;
+                        }
+                        this.SnapCtrl.Document.Selection = this.SnapCtrl.Document.CreateRange(minPos, maxPos - minPos);
+                        log.InfoFormat("[{0}]Set Sel at:{0} with {1}", minPos - currentSectionOffset, maxPos - minPos);
+                        return new Tuple<int, int>(minPos - currentSectionOffset, maxPos - currentSectionOffset);
                     }
-                    if ((maxPos - minPos) > currentSectionLength)
+                    else
                     {
-                        minPos = currentSectionOffset;
-                        maxPos = currentSectionOffset + currentSectionLength - 1;
+                        this.currentSelectedInterp = null;
                     }
-                    this.SnapCtrl.Document.Selection = this.SnapCtrl.Document.CreateRange(minPos, maxPos - minPos);
-                    log.InfoFormat("Set Sel at:{0} with {1}", minPos - currentSectionOffset, maxPos - minPos);
-                    return new Tuple<int, int>(minPos, maxPos);
                 }
-                else
-                {
-                    this.currentSelectedInterp = null;
-                }
+                log.Info("Ignored Set Sel Comamnd");
+                return new Tuple<int, int>(0, 0);
             }
-            log.Info("Ignored Set Sel Comamnd");
-            return new Tuple<int, int>(0, 0);
         }
 
         public Rectangle PosFromChar(int charPos)
@@ -305,12 +326,12 @@ namespace SnapTestDocuments
                 else
                 {
                     this.currentSelectedInterp = null;
-                    log.InfoFormat("Ignored Set Sel Comamnd reason: no section field {0}", currentSectionField == null ? "true" : "false");
+                    log.InfoFormat("[{0}]Ignored Set Sel Comamnd reason: no section field {1}", RuntimeHelpers.GetHashCode(this), currentSectionField == null ? "true" : "false");
                 }
             }
             else
             {
-                log.InfoFormat("Ignored Set Sel Comamnd reason: unselected section {0}", currentSelectedInterp == null ? "true" : "false");
+                log.InfoFormat("[{0}]Ignored Set Sel Comamnd reason: unselected section {1}", RuntimeHelpers.GetHashCode(this), currentSelectedInterp == null ? "true" : "false");
             }
             return new Rectangle();
         }
