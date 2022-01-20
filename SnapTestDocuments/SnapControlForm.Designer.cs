@@ -36,7 +36,6 @@ namespace SnapTestDocuments
             this.textBox1 = new SnapTestDocuments.ExtTextControl();
             this.label1 = new System.Windows.Forms.Label();
             this.snapDockManager1 = new DevExpress.Snap.Extensions.SnapDockManager(this.components);
-            this.snapControl1 = new SnapTestDocuments.ExtSnapControl();
             this.btnSaveDoc = new System.Windows.Forms.Button();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
@@ -51,6 +50,8 @@ namespace SnapTestDocuments
             this.btnPasteText = new System.Windows.Forms.Button();
             this.btnSection = new System.Windows.Forms.Button();
             this.lbSections = new System.Windows.Forms.ListBox();
+            this.button1 = new System.Windows.Forms.Button();
+            this.snapControl2 = new DictSnapControl();
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -101,7 +102,7 @@ namespace SnapTestDocuments
             // snapDockManager1
             // 
             this.snapDockManager1.Form = this;
-            this.snapDockManager1.SnapControl = this.snapControl1;
+            this.snapDockManager1.SnapControl = this.snapControl2;
             this.snapDockManager1.TopZIndexControls.AddRange(new string[] {
             "DevExpress.XtraBars.BarDockControl",
             "DevExpress.XtraBars.StandaloneBarDockControl",
@@ -115,17 +116,6 @@ namespace SnapTestDocuments
             "DevExpress.XtraBars.TabFormControl",
             "DevExpress.XtraBars.FluentDesignSystem.FluentDesignFormControl",
             "DevExpress.XtraBars.ToolbarForm.ToolbarFormControl"});
-            // 
-            // snapControl1
-            // 
-            this.snapControl1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.snapControl1.Location = new System.Drawing.Point(0, 0);
-            this.snapControl1.Name = "snapControl1";
-            this.snapControl1.Options.DocumentCapabilities.TrackChanges = DevExpress.XtraRichEdit.DocumentCapability.Disabled;
-            this.snapControl1.Options.SnapMailMergeVisualOptions.DataSourceName = null;
-            this.snapControl1.Size = new System.Drawing.Size(909, 291);
-            this.snapControl1.TabIndex = 0;
-            this.snapControl1.Text = "snapControl1";
             // 
             // btnSaveDoc
             // 
@@ -165,7 +155,7 @@ namespace SnapTestDocuments
             // 
             // splitContainer2.Panel1
             // 
-            this.splitContainer2.Panel1.Controls.Add(this.snapControl1);
+            this.splitContainer2.Panel1.Controls.Add(this.snapControl2);
             // 
             // splitContainer2.Panel2
             // 
@@ -207,7 +197,7 @@ namespace SnapTestDocuments
             // 
             // snapDocumentManager1
             // 
-            this.snapDocumentManager1.ClientControl = this.snapControl1;
+            this.snapDocumentManager1.ClientControl = this.snapControl2;
             this.snapDocumentManager1.View = this.noDocumentsView1;
             this.snapDocumentManager1.ViewCollection.AddRange(new DevExpress.XtraBars.Docking2010.Views.BaseView[] {
             this.noDocumentsView1,
@@ -253,6 +243,27 @@ namespace SnapTestDocuments
             this.lbSections.TabIndex = 8;
             this.lbSections.SelectedIndexChanged += new System.EventHandler(this.lbSections_SelectedIndexChanged);
             // 
+            // button1
+            // 
+            this.button1.Location = new System.Drawing.Point(840, 75);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(75, 23);
+            this.button1.TabIndex = 6;
+            this.button1.Text = "Record";
+            this.button1.UseVisualStyleBackColor = true;
+            this.button1.Click += new System.EventHandler(this.btnSection_Click);
+            // 
+            // snapControl2
+            // 
+            this.snapControl2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.snapControl2.Location = new System.Drawing.Point(0, 0);
+            this.snapControl2.Name = "snapControl2";
+            this.snapControl2.Options.DocumentCapabilities.TrackChanges = DevExpress.XtraRichEdit.DocumentCapability.Disabled;
+            this.snapControl2.Options.SnapMailMergeVisualOptions.DataSourceName = null;
+            this.snapControl2.Size = new System.Drawing.Size(909, 291);
+            this.snapControl2.TabIndex = 0;
+            this.snapControl2.Text = "snapControl2";
+            // 
             // SnapControlForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -260,6 +271,7 @@ namespace SnapTestDocuments
             this.ClientSize = new System.Drawing.Size(1211, 697);
             this.Controls.Add(this.lbSections);
             this.Controls.Add(this.btnPasteText);
+            this.Controls.Add(this.button1);
             this.Controls.Add(this.btnSection);
             this.Controls.Add(this.btnDocSetup);
             this.Controls.Add(this.splitContainer1);
@@ -299,8 +311,7 @@ namespace SnapTestDocuments
         private DevExpress.Snap.Extensions.SnapDockManager snapDockManager1;
         private System.Windows.Forms.Button btnSaveDoc;
         private System.Windows.Forms.SplitContainer splitContainer1;
-        private ExtSnapControl snapControl1;
-        private DevExpress.Snap.Extensions.SnapDocumentManager snapDocumentManager1;
+                private DevExpress.Snap.Extensions.SnapDocumentManager snapDocumentManager1;
         private DevExpress.XtraBars.Docking2010.Views.NoDocuments.NoDocumentsView noDocumentsView1;
         private DevExpress.XtraBars.Docking2010.Views.Tabbed.TabbedView tabbedView1;
         private System.Windows.Forms.TextBox textBox2;
@@ -312,6 +323,8 @@ namespace SnapTestDocuments
         private TXTextControl.RulerBar rulerBar1;
         private System.Windows.Forms.Button btnSection;
         private System.Windows.Forms.ListBox lbSections;
+        private System.Windows.Forms.Button button1;
+        private DictSnapControl snapControl2;
     }
 }
 

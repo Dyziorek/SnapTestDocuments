@@ -4,8 +4,10 @@ using System.Data;
 using System.IO;
 using System.IO.Packaging;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using System.Xml.Linq;
+using Nuance.SpeechAnywhere;
 
 namespace SnapTestDocuments
 {
@@ -14,10 +16,65 @@ namespace SnapTestDocuments
         private MemoryStream memoryStream;
         private SnapContextImpl context;
         private DocumentEntityBase selectedItem;
+        private Nuance.SpeechAnywhere.Custom.VuiController vuiController;
+        private DictSnapControl[] myControls;
+
+        //private Nuance.SoD.TextControl.TextControlManager manager;
+        //private Nuance.SoD.TextControl.SodGateway connector = Nuance.SoD.TextControl.SodGateway.Instance;
         public SnapControlForm()
         {
             InitializeComponent();
+            StringBuilder resultWholeText = new StringBuilder();
+            var sree = resultWholeText.ToString();
+            log4net.LogManager.GetLogger("DictSnapControl").ErrorFormat("Empry SB '{0}'", sree);
+            log4net.Config.XmlConfigurator.Configure(new FileInfo(string.Format("{0}.config", @"C:\Users\ddus\source\repos\SnapTestDocuments\SnapTestDocuments\bin\Deploy\log4net")));
+            //string fx = "The quick brown fox jumps over lazy";
+            //string fxc = "The brown fox jumps over lazy";
+
+            //DiffMatchPatchText matchPatchText = new DiffMatchPatchText();
+            //var differ = matchPatchText.diff_main(fx, fxc);
+            //var deltat = matchPatchText.diff_toDelta(differ);
+            //System.Diagnostics.Debug.WriteLine(deltat);
+            myControls = new DictSnapControl[] { snapControl2 };
+            InitializeVuiController();
+
+
+
         }
+        private void InitializeVuiController()
+        {
+            // Add event handlers for RecordingStarted and RecordingStopped events
+            Session.SharedSession.RecordingStarted += new RecordingStarted(SharedSession_RecordingStarted);
+            Session.SharedSession.RecordingStopped += new RecordingStopped(SharedSession_RecordingStopped);
+
+            vuiController = new Nuance.SpeechAnywhere.Custom.VuiController
+            {
+                // Set the recognition language. This overrides the default setting which is the current UI culture;
+                Language = "en-us"
+            };
+            // Enable name field navigation.
+            // For example, the first text control is associated with the "medical history" concept. 
+            // Users can say "go to medical history" to reach this text control.
+            // SetConceptName() must be called before Initialize() to be effective.
+            vuiController.SetConceptName(myControls[0], "medical history");
+
+            // Initialize the VuiController by passing Nuance.SpeechAnywhere.Custom.ITextControl[] - which is in this case "myControls"
+            vuiController.Open(myControls);
+            vuiController.Focused = true;
+        }
+
+        void SharedSession_RecordingStarted()
+        {
+            // This event occurs in case recording was started.
+            // We react by changing the toggle record button title. 
+        }
+
+        void SharedSession_RecordingStopped()
+        {
+            // This event occurs in case recording was stopped.
+            // We react by changing the toggle record button title. 
+        }
+
 
         private void BntOpen_Click(object sender, EventArgs e)
         {
@@ -42,16 +99,21 @@ namespace SnapTestDocuments
 
                 textBox1.Text = openFileDialog1.FileName;
 
-                snapControl1.LoadDocument(textBox1.Text);
-                snapControl1.Options.Bookmarks.Visibility = DevExpress.XtraRichEdit.RichEditBookmarkVisibility.Visible;
+                snapControl2.LoadDocument(textBox1.Text);
+                snapControl2.Options.Bookmarks.Visibility = DevExpress.XtraRichEdit.RichEditBookmarkVisibility.Visible;
                 if (context == null)
                 {
                     context = new SnapContextImpl();
-                    snapControl1.SetContext = context;
-                    context.WorkControl = snapControl1;
-                    IDragonAccessManager accMgr = context.GetManager<IDragonAccessManager>();
-                    IInterpSectionsManager sectionMgr = context.GetManager<IInterpSectionsManager>();
+                    snapControl2.SetContext = context;
+                    context.WorkControl = snapControl2;
+                    //connector.Start(context);
+                    context.GetManager<IDragonAccessManager>()?.UpdateSelectedItem(new DocumentEntityBase{ name = "", Type = DocumentEntityTypes.EmptySection});
                 }
+                else
+                {
+                    context.GetManager<IDragonAccessManager>()?.UpdateSelectedItem(new DocumentEntityBase { name = "", Type = DocumentEntityTypes.EmptySection });
+                }
+                lbSections.Items.Clear();
             }
 
             XDocument snDocument = GetDocumentFromPackage(memoryStream);
@@ -78,26 +140,31 @@ namespace SnapTestDocuments
 
         private void BtnSaveDoc_Click(object sender, EventArgs e)
         {
-            snapControl1.SaveDocumentAs();
+            snapControl2.SaveDocumentAs();
 
         }
 
         private void BtnDocSetup_Click(object sender, EventArgs e)
         {
-            //ShowPageSetupFormCommand cmd = new ShowPageSetupFormCommand(snapControl1);
+            //ShowPageSetupFormCommand cmd = new ShowPageSetupFormCommand(snapControl2);
             //cmd.Execute();
 
-            //var doc = snapControl1.Document;
+            //var doc = snapControl2.Document;
 
-            //var table = snapControl1.Document.Tables.Create(doc.Range.End, 1, 1);
+            //var table = snapControl2.Document.Tables.Create(doc.Range.End, 1, 1);
 
             //var fieldInfo = doc.Fields.Create(table.Cell(0, 0).ContentRange.Start, "SN EF|MACRO|SlideResultsMacro|SNF");
             //fieldInfo.ShowCodes = false;
             //doc.InsertText(fieldInfo.ResultRange.Start, "Slide Results Macro");
 
-            //DevExpress.XtraRichEdit.Commands.ToggleShowWhitespaceCommand too = new ToggleShowWhitespaceCommand(snapControl1);
+            //DevExpress.XtraRichEdit.Commands.ToggleShowWhitespaceCommand too = new ToggleShowWhitespaceCommand(snapControl2);
             //too.Execute();
-
+            var ranger = snapControl2.Document.CreateRange(0, snapControl2.Document.Length);
+            var subDoc = ranger.BeginUpdateDocument();
+            subDoc.BeginUpdate();
+            subDoc.Replace(ranger, "");
+            subDoc.EndUpdate();
+            ranger.EndUpdateDocument(subDoc);
             
         }
 
@@ -125,7 +192,7 @@ namespace SnapTestDocuments
                     XDocument snDocument = GetDocumentFromPackage(memStr);
                     FilTreeView(snDocument);
                     memStr.Seek(0, SeekOrigin.Begin);
-                    snapControl1.LoadDocument(memStr);
+                    snapControl2.LoadDocument(memStr);
                 }
 
 
@@ -135,12 +202,12 @@ namespace SnapTestDocuments
         private void btnSection_Click(object sender, EventArgs e)
         {
 
-            DevExpress.XtraRichEdit.API.Native.DocumentPosition documentPosition = snapControl1.Document.Selection.Start;
+            DevExpress.XtraRichEdit.API.Native.DocumentPosition documentPosition = snapControl2.Document.Selection.Start;
             selectedItem = null;
             lbSections.Items.Clear();
-            foreach (var fieldInfo in snapControl1.Document.Fields)
+            foreach (var fieldInfo in snapControl2.Document.Fields)
             {
-                var fieldCodeText = snapControl1.Document.GetText(fieldInfo.CodeRange);
+                var fieldCodeText = snapControl2.Document.GetText(fieldInfo.CodeRange);
                 var fieldCodePar = new string(fieldCodeText.Take(fieldCodeText.IndexOf("_FUNCTION")).Skip(11).ToArray());
                 if (fieldCodeText.Contains("_FUNCTION") &&
                 SnapDocumentRangeTools.IsTargetDocumentPositionInBaseDocumentRange(fieldInfo.Range, documentPosition))
@@ -162,7 +229,7 @@ namespace SnapTestDocuments
             IInterpSectionsManager sectionMgr = context.GetManager<IInterpSectionsManager>();
             var sectionField = sectionMgr.GetSectionField(selectedItem);
             if (sectionField != null)
-                System.Diagnostics.Debug.WriteLine(snapControl1.Document.GetText(sectionField.CodeRange));
+                System.Diagnostics.Debug.WriteLine(snapControl2.Document.GetText(sectionField.CodeRange));
 
             context.GetManager<IDragonAccessManager>().UpdateSelectedItem(selectedItem);
         }
@@ -172,9 +239,9 @@ namespace SnapTestDocuments
             var results = lbSections.SelectedItem as string;
             if (results != null)
             {
-                foreach (var fieldInfo in snapControl1.Document.Fields)
+                foreach (var fieldInfo in snapControl2.Document.Fields)
                 {
-                    var fieldCodeText = snapControl1.Document.GetText(fieldInfo.CodeRange);
+                    var fieldCodeText = snapControl2.Document.GetText(fieldInfo.CodeRange);
                     if (fieldCodeText.Contains(results))
                     {
                         context.SnapDocument.CaretPosition = fieldInfo.ResultRange.End;

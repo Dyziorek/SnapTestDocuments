@@ -1,7 +1,6 @@
 ﻿using DevExpress.XtraRichEdit.API.Native;
 using System;
 using System.Drawing;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -11,10 +10,9 @@ namespace SnapTestDocuments
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
         private DocumentEntityBase currentSelectedInterp = null;
-        private ITextFieldInfo currentSectionField = null;
+        private Field currentSectionField = null;
         int currentSectionOffset = 0;
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0); //start, end
-        private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);
         private Tuple<int, Rectangle> lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
         private string cacheStringText = string.Empty;
 
@@ -38,17 +36,31 @@ namespace SnapTestDocuments
         {
             if (this.currentSelectedInterp != null)
             {
-                log.InfoFormat("DragAccMgrCmn  GetSel returns p:{0}, l:{1}", lastselectionPair.Item1, lastselectionPair.Item2);
+                if (replaceLock)
+                    return lastselectionPair;
+
+                //if (lastselectionPair.Item1 - lastselectionPair.Item2 == 0)
+                //{
+                //    var docSelection = this.SnapCtrl.Document.CaretPosition.ToInt();
+
+                //    int curPos = docSelection - currentSectionOffset;
+                //    if (curPos > 0 && curPos <= currentSectionField.ResultRange.Length)
+                //    {
+                //        lastselectionPair = new Tuple<int, int>(curPos, curPos);
+                //    }
+                //}
+
+                log.InfoFormat("[{0}] DragAccMgrCmn  GetSel returns p:{1}, l:{2}", Thread.CurrentThread.ManagedThreadId, lastselectionPair.Item1, lastselectionPair.Item2);
                 return lastselectionPair;
             }
-            log.InfoFormat("DragAccMgrCmn GetSel returns zero p:{0}, l:{1}", 0, 0);
+            log.InfoFormat("[{0}] DragAccMgrCmn GetSel returns zero p:{1}, l:{2}", Thread.CurrentThread.ManagedThreadId, 0, 0);
             return new Tuple<int, int>(0, 0);
 
         }
 
         public string GetText()
         {
-            log.InfoFormat("DragAccMgrCmn GetText:'{0}'", cacheStringText);
+            log.InfoFormat("[{0}] DragAccMgrCmn GetText:'{1}'", Thread.CurrentThread.ManagedThreadId, cacheStringText);
             return cacheStringText;
         }
 
@@ -58,7 +70,7 @@ namespace SnapTestDocuments
             string textResult = GetText();
             if (!string.IsNullOrEmpty(textResult))
             {
-                log.InfoFormat("DragAccMgrCmn TextLen:{0}", textResult.Length);
+                log.InfoFormat("[{0}] DragAccMgrCmn TextLen:{1}", Thread.CurrentThread.ManagedThreadId, textResult.Length);
                 return textResult.Length;
             }
 
@@ -79,7 +91,7 @@ namespace SnapTestDocuments
             log.Info("SnapControl_SelectionChanged:");
             if (this.currentSelectedInterp != null)
             {
-                if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
+                if (currentSectionField != null)
                 {
                     var docSelection = this.SnapCtrl.Document.Selection;
                     int startPos = docSelection.Start.ToInt();
@@ -90,13 +102,18 @@ namespace SnapTestDocuments
 
                     int minPos = Math.Min(startPos - currentSectionOffset, endPos - currentSectionOffset);
                     int maxPos = Math.Max(startPos - currentSectionOffset, endPos - currentSectionOffset);
+                    //if (maxPos == minPos)
+                    //{
+                    //    maxPos += 1;
+                    //    minPos += 1;
+                    //}
                     if ((maxPos - minPos) >= currentSectionLength)
                     {
                         minPos = 0;
-                        maxPos = currentSectionLength;
+                        maxPos = currentSectionLength - 1;
                     }
 
-                    log.InfoFormat("DragAccMgrCmn Current Selection begin:{0}, end:{1}", minPos, maxPos);
+                    log.InfoFormat("[{0}] DragAccMgrCmn Current Selection begin:{1}, end:{2}", Thread.CurrentThread.ManagedThreadId, minPos, maxPos);
                     lastselectionPair = new Tuple<int, int>(minPos, maxPos);
                 }
                 else
@@ -111,9 +128,9 @@ namespace SnapTestDocuments
             log.Debug("SnapControl_ContentChanged:");
             if (this.currentSelectedInterp != null)
             {
-                if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField.Field))
+                if (currentSectionField != null)
                 {
-                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
+                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.ResultRange);
                 }
                 else
                 {
@@ -130,6 +147,27 @@ namespace SnapTestDocuments
             }
         }
 
+        //public bool InsertText(string text)
+        //{
+        //    if (!string.IsNullOrEmpty(text))
+        //    {
+        //        if (SnapRangePermissionsTools.IsDocumentPositionEditableRange(SnapCtrl.Document, SnapCtrl.Document.CaretPosition))
+        //        {
+        //            this.SnapCtrl.Document.BeginUpdate();
+        //            if (this.SnapCtrl.Document.Selection.Length > 0 && SnapRangePermissionsTools.IsDocumentRangeEditableRange(SnapCtrl.Document, this.SnapCtrl.Document.Selection))
+        //            {
+        //                this.SnapCtrl.Document.Delete(this.SnapCtrl.Document.Selection);
+        //            }
+        //            this.SnapCtrl.Document.EndUpdate();
+        //            SnapCtrl.BeginUpdate();
+        //            SnapCtrl.Document.InsertText(SnapCtrl.Document.CaretPosition, text);
+        //            SnapCtrl.EndUpdate();
+        //            return true;
+        //        }
+        //    }
+        //    return false;
+        //}
+
         public bool HasSections()
         {
             log.Debug("HasSections:");
@@ -145,7 +183,7 @@ namespace SnapTestDocuments
                 {
                     currentSectionOffset = sectionField.ResultRange.Start.ToInt();
                     cacheStringText = SnapCtrl.Document.GetText(sectionField.ResultRange);
-                    this.currentSectionField = sectionField.GetTextFieldInfo(SnapCtrl.Document); 
+                    this.currentSectionField = sectionField;
                     this.currentSelectedInterp = selectedItem;
                 }
                 else
@@ -169,77 +207,69 @@ namespace SnapTestDocuments
             lock (this)
             {
                 log.DebugFormat("ReplaceText with '{0}'", text);
+                //BugInjection.Injector inject = new BugInjection.Injector();
+                //string stackTrace = inject.GenerateCallStack(1);
+                //log.Info(stackTrace);
                 if (!string.IsNullOrEmpty(text))
                 {
-                    if (this.currentSelectedInterp != null && this.currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
+                    if (this.currentSelectedInterp != null && this.currentSectionField != null)
                     {
                         var selection = this.SnapCtrl.Document.Selection;
-                        if (lastselectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2 && requestSelectPair.Item1 + currentSectionOffset + 1 == selection.Start.ToInt())
+                        if (selection.Start.ToInt() > currentSectionField.ResultRange.End.ToInt())
                         {
-                            // Dragon resets selected word to single cursor after selected word just before replacing this with new word
-                            // so we need to restore selection before replacing
-                            if (log.IsDebugEnabled)
-                            {
-                                log.DebugFormat("Use cached selection: current sel: {0} , cache sel:{1}, snap selection pos {3}", requestSelectPair, lastselectionPair, selection.Start.ToInt());
-                            }
-                            selection = this.SnapCtrl.Document.CreateRange(lastselectionPair.Item1 + currentSectionOffset, Math.Abs(lastselectionPair.Item2 - lastselectionPair.Item1));
+                            selection = this.SnapCtrl.Document.CreateRange(currentSectionField.ResultRange.End.ToInt(), 0);
                         }
-
-                        if (selection.Start.ToInt() > currentSectionField.Field.ToSnap().ResultRange.End.ToInt())
+                        else if (selection.End.ToInt() < currentSectionField.ResultRange.Start.ToInt())
                         {
-                            selection = this.SnapCtrl.Document.CreateRange(currentSectionField.Field.ToSnap().ResultRange.End.ToInt(), 0);
-                        }
-                        else if (selection.End.ToInt() < currentSectionField.Field.ToSnap().ResultRange.Start.ToInt())
-                        {
-                            selection = this.SnapCtrl.Document.CreateRange(currentSectionField.Field.ToSnap().ResultRange.Start.ToInt(), 0);
+                            selection = this.SnapCtrl.Document.CreateRange(currentSectionField.ResultRange.Start.ToInt(), 0);
                         }
                         else
                         {
-                            log.InfoFormat("DragAccMgrCmn Replace Text selected: {0} size:{1}", selection.Start.ToInt() - currentSectionOffset, selection.Length);
+                            log.InfoFormat("[{0}] DragAccMgrCmn Replace Text selected: {1} size:{2}", Thread.CurrentThread.ManagedThreadId, selection.Start.ToInt() - currentSectionOffset, selection.Length);
                         }
                         if (SnapRangePermissionsTools.IsDocumentRangeEditableRange(SnapCtrl.Document, selection))
                         {
-                            log.InfoFormat("DragAccMgrCmn Replace Text:'{0}'", text);
+                            log.InfoFormat("[{0}] DragAccMgrCmn Replace Text:'{1}'", Thread.CurrentThread.ManagedThreadId , text);
 
-                            if (selection.End == currentSectionField.Field.ToSnap().ResultRange.End)
+                            if (currentSectionField != null)
                             {
-                                if (cacheStringText.Length > 0 && !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]) && !Char.IsWhiteSpace(text[0]))
+                                if (selection.End == currentSectionField.ResultRange.End)
                                 {
-                                    log.InfoFormat("DragAccMgrCmn Adding space existing text: '{0}', addedText '{1}', lastCharWhiteSpace:{2}, first:{3}", cacheStringText, text, !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]), !Char.IsWhiteSpace(text[0]));
-                                    text = " " + text;
+                                    if (cacheStringText.Length > 0 && !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]) && !Char.IsWhiteSpace(text[0]))
+                                    {
+                                        log.InfoFormat("[{0}] DragAccMgrCmn Adding space existing text: '{1}', addedText '{2}', lastCharWhiteSpace:{3}, first:{4}", Thread.CurrentThread.ManagedThreadId, cacheStringText, text, !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]), !Char.IsWhiteSpace(text[0]));
+                                        text = " " + text;
+                                    }
+                                }
+                                SubDocument docFragment = selection.BeginUpdateDocument();
+                                try
+                                {
+                                    this.SnapCtrl.BeginUpdate();
+                                    replaceLock = true;
+                                    docFragment.Replace(selection, text);
+                                    currentSectionField.Update();
+                                }
+                                finally
+                                {
+                                    selection.EndUpdateDocument(docFragment);
+                                    this.SnapCtrl.EndUpdate();
+                                    
+                                    if (selection.End <= currentSectionField.ResultRange.End)
+                                    {
+                                        this.SnapCtrl.Document.CaretPosition = selection.End;
+                                        lastselectionPair = new Tuple<int, int>(selection.End.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
+                                    }
+                                    else
+                                    {
+                                        this.SnapCtrl.Document.CaretPosition = currentSectionField.ResultRange.End;
+                                        lastselectionPair = new Tuple<int, int>(currentSectionField.ResultRange.End.ToInt() - currentSectionOffset, currentSectionField.ResultRange.End.ToInt() - currentSectionOffset);
+                                    }
+
+                                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.ResultRange);
+                                    replaceLock = false;
+                                    log.InfoFormat("[{0}] DragAccMgrCmn Whole Section Text after replace:'{1}'", Thread.CurrentThread.ManagedThreadId, cacheStringText);
                                 }
                             }
-                            SubDocument docFragment = selection.BeginUpdateDocument();
-                            try
-                            {
-                                docFragment.BeginUpdate();
-                                replaceLock = true;
-                                text = CalculateCachedTextChanges(selection, text);
-                                docFragment.Replace(selection, text);
-                                //currentSectionField.Field.ToSnap().Update();
-                            }
-                            finally
-                            {
-                                docFragment.EndUpdate();
-                                selection.EndUpdateDocument(docFragment);
-                                
-
-                                if (selection.End <= currentSectionField.Field.ToSnap().ResultRange.End)
-                                {
-                                    this.SnapCtrl.Document.CaretPosition = selection.End;
-                                    lastselectionPair = new Tuple<int, int>(selection.End.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
-                                }
-                                else
-                                {
-                                    this.SnapCtrl.Document.CaretPosition = currentSectionField.Field.ToSnap().ResultRange.End;
-                                    lastselectionPair = new Tuple<int, int>(currentSectionField.Field.ToSnap().ResultRange.End.ToInt() - currentSectionOffset, currentSectionField.Field.ToSnap().ResultRange.End.ToInt() - currentSectionOffset);
-                                }
-
-                                cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
-                                replaceLock = false;
-                                log.InfoFormat("DragAccMgrCmn Whole Section Text after replace:'{0}'", cacheStringText);
-                            }
-
                         }
                     }
                     else if (currentSelectedInterp == null)
@@ -261,7 +291,7 @@ namespace SnapTestDocuments
             log.DebugFormat("SetSel: {0}, {1}", start, end);
             if (this.currentSelectedInterp != null)
             {
-                if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
+                if (currentSectionField != null)
                 {
                     int currentSectionLength = currentSectionField.ResultRange.Length;
 
@@ -269,22 +299,19 @@ namespace SnapTestDocuments
                     this.lastselectionPair = new Tuple<int, int>(selection.Start.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
                     int minPos = Math.Min(currentSectionOffset + start, currentSectionOffset + end);
                     int maxPos = Math.Max(currentSectionOffset + start, currentSectionOffset + end);
+                    if (maxPos == minPos)
+                    {
+                        maxPos += 1;
+                        minPos += 1;
+                    }
                     if ((maxPos - minPos) > currentSectionLength)
                     {
                         minPos = currentSectionOffset;
                         maxPos = currentSectionOffset + currentSectionLength - 1;
                     }
-                    if ((maxPos - minPos) == 0)
-                    {
-                        this.SnapCtrl.Document.CaretPosition = this.SnapCtrl.Document.CreatePosition(minPos + 1);
-                    }
-                    else
-                    {
-                        this.SnapCtrl.Document.Selection = this.SnapCtrl.Document.CreateRange(minPos, maxPos - minPos);
-                    }
-                    log.InfoFormat("DragAccMgrCmn  Set Sel at:{0} with {1}", minPos - currentSectionOffset, maxPos - minPos);
-                    requestSelectPair =new Tuple<int, int>(minPos - currentSectionOffset, maxPos - currentSectionOffset);
-                    return requestSelectPair;
+                    this.SnapCtrl.Document.Selection = this.SnapCtrl.Document.CreateRange(minPos, maxPos - minPos);
+                    log.InfoFormat("[{0}] DragAccMgrCmn  Set Sel at:{1} with {2}", Thread.CurrentThread.ManagedThreadId, minPos - currentSectionOffset, maxPos - minPos);
+                    return new Tuple<int, int>(minPos - currentSectionOffset, maxPos - currentSectionOffset);
                 }
                 else
                 {
@@ -301,9 +328,9 @@ namespace SnapTestDocuments
             log.DebugFormat("PosFromChar: for charpos {0}", charPos);
             if (this.currentSelectedInterp != null)
             {
-                if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
+                if (currentSectionField != null)
                 {
-                    int currentSectionOffset = currentSectionField.Field.ToSnap().ResultRange.Start.ToInt();
+                    int currentSectionOffset = currentSectionField.ResultRange.Start.ToInt();
                     int currentSectionLength = currentSectionField.ResultRange.Length;
 
                     int minPos = Math.Min(currentSectionOffset + charPos, currentSectionOffset + currentSectionLength);
@@ -318,12 +345,12 @@ namespace SnapTestDocuments
                 else
                 {
                     this.currentSelectedInterp = null;
-                    log.InfoFormat("DragAccMgrCmn Ignored Set Sel Comamnd reason: no section field");
+                    log.InfoFormat("[{0}] DragAccMgrCmn Ignored Set Sel Comamnd reason: no section field {1}", Thread.CurrentThread.ManagedThreadId, currentSectionField == null ? "true" : "false");
                 }
             }
             else
             {
-                log.InfoFormat("DragAccMgrCmn Ignored Set Sel Comamnd reason: unselected section");
+                log.InfoFormat("[{0}] DragAccMgrCmn Ignored Set Sel Comamnd reason: unselected section {1}", Thread.CurrentThread.ManagedThreadId, currentSelectedInterp == null ? "true" : "false");
             }
             return new Rectangle();
         }
@@ -333,57 +360,15 @@ namespace SnapTestDocuments
             log.DebugFormat("CharFromPos: from {0}", charPos);
             if (this.currentSelectedInterp != null)
             {
-                if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
+                if (currentSectionField != null)
                 {
-                    int currentSectionOffset = currentSectionField.Field.ToSnap().ResultRange.Start.ToInt();
+                    int currentSectionOffset = currentSectionField.ResultRange.Start.ToInt();
                     int currentSectionLength = currentSectionField.ResultRange.Length;
                     int minPos = Math.Min(snapCtrlCtx.SnapControl.GetPositionFromPoint(charPos).ToInt(), currentSectionOffset + currentSectionLength);
                     return Math.Max(0, minPos - currentSectionOffset);
                 }
             }
             return -1;
-        }
-
-        private string CalculateCachedTextChanges(DocumentRange caretPos, string messageText)
-        {
-            string oldCachedText = cacheStringText;
-
-            int changeTextPos = caretPos.Start.ToInt() - currentSectionOffset;
-
-            if (changeTextPos > 0 && changeTextPos < cacheStringText.Length)
-            {
-                string begin = cacheStringText.Substring(0, changeTextPos);
-                string end = cacheStringText.Substring(changeTextPos + caretPos.Length);
-
-                log.InfoFormat("Cached Text '{0}', begin with '{1}', ends with '{2}'", cacheStringText, begin, end);
-
-                log.InfoFormat("Update cached text on replacing: old cached '{0}', text to replace '{1}'  at {2} , result '{3}'", oldCachedText, messageText, caretPos.Start.ToInt(), begin + messageText + end);
-                if (begin.Length > 0 && begin.Last() == ' ' && messageText.Length > 0 && messageText.First() == ' ')
-                {
-                    log.InfoFormat("Correction '{0}'", messageText.Substring(1));
-                    return messageText.Substring(1);
-                }
-                log.InfoFormat("New text '{0}'", messageText.Substring(1));
-            }
-            else
-            {
-                log.InfoFormat("Unable to correct text '{0}' based on cache", messageText);
-                log.InfoFormat("Cache text '{0}', text size:{1}, postion to verify:{2}", cacheStringText, cacheStringText.Length, changeTextPos);
-            }
-            return messageText;
-        }
-
-        public void TurnOn()
-        {
-            TurnOff();
-            this.snapCtrlCtx.SnapControl.ContentChanged += SnapControl_ContentChanged;
-            this.snapCtrlCtx.SnapControl.SelectionChanged += SnapControl_SelectionChanged;
-        }
-
-        public void TurnOff()
-        {
-            this.snapCtrlCtx.SnapControl.ContentChanged -= SnapControl_ContentChanged;
-            this.snapCtrlCtx.SnapControl.SelectionChanged -= SnapControl_SelectionChanged;
         }
     }
 }

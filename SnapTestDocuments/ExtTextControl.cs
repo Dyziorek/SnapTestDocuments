@@ -6,7 +6,7 @@ namespace SnapTestDocuments
 
     class ExtTextControl : TextBox
     {
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtTextControl");
 
         protected override void WndProc(ref Message m)
         {
@@ -18,7 +18,7 @@ namespace SnapTestDocuments
             switch (m.Msg)
             {
                 case 12:
-                    log.Info(string.Format("Entered whole text: {0}", Marshal.PtrToStringAuto(m.LParam)));
+                    log.Debug(string.Format("Entered whole text: {0}", Marshal.PtrToStringAuto(m.LParam)));
                     break;
                 case 13:
                     log.Info(string.Format("Read whole text: {0}", Marshal.PtrToStringAuto(m.LParam)));
@@ -49,7 +49,7 @@ namespace SnapTestDocuments
                         log.Debug(string.Format("PosFromChar CharPos :{0}  return: values({1:X}) x.y:{2},{3} ", (int)m.WParam & 0x0000FFFF, (int)m.Result, (int)m.Result & 0x0000FFFF, ((int)m.Result & 0xFFFF0000) >> 16));
                     break;
                 default:
-                    log.Info("Message: " + m.ToString());
+                    log.Debug("Message: " + m.ToString());
                     break;
             }
 

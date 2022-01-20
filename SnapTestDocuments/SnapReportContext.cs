@@ -1,21 +1,77 @@
 ﻿using DevExpress.Snap;
+using DevExpress.Snap.Core.API;
 using DevExpress.XtraRichEdit.API.Native;
+//using Nuance.SoD.TextControl;
 using System;
+using System.Linq;
+using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
+using TextEditor.Core.API;
+
+namespace TextEditor.Core.API
+{
+    public class IField
+    {
+        private Field nativeField;
+        public IField(Field native)
+        {
+            nativeField = native;
+        }
+        public Field FieldNative
+        {
+            get
+            {
+                return nativeField;
+            }
+        }
+
+        public DocumentRange ResultRange => nativeField.ResultRange;
+    }
+}
 
 namespace SnapTestDocuments
 {
+    public interface IDocumentPosition
+    {
+        int Position { get; }
+    }
+
+    public interface IDocumentRange
+    {
+        IDocumentPosition Start { get; }
+        IDocumentPosition End { get; }
+        int Length { get; }
+    }
 
     public enum DocumentEntityTypes
     {
-        InterpretationSection
+        InterpretationSection,
+        EmptySection
     }
 
     public class DocumentEntityBase
     {
         public string name;
         public DocumentEntityTypes Type;
+    }
+
+    public interface ITextFieldInfo
+    {
+        TextEditor.Core.API.IField Field { get; }
+        IDocumentRange ResultRange { get; }
+
+        ISubDocument Document { get; }
+    }
+
+    public interface IFieldCollection : IReadOnlyCollection<IField>
+    {
+
+    }
+
+    public interface ISubDocument : System.IEquatable<ISubDocument>
+    {
+        IFieldCollection Fields { get; }
     }
 
     public interface ITextEditManager
@@ -61,7 +117,7 @@ namespace SnapTestDocuments
 
     public interface IInterpSectionsManager : ITextEditManager
     {
-        
+
 
         DevExpress.XtraRichEdit.API.Native.Field GetSectionField(DocumentEntityBase sectionEntity);
 
@@ -81,7 +137,7 @@ namespace SnapTestDocuments
 
         public void Clear()
         {
-            
+
         }
 
         public Field GetSectionField(DocumentEntityBase sectionEntity)
@@ -106,7 +162,7 @@ namespace SnapTestDocuments
 
         public void Init()
         {
-            foreach(Field checkingField in documentControl.Document.Fields)
+            foreach (Field checkingField in documentControl.Document.Fields)
             {
                 var fieldCodeText = documentControl.Document.GetText(checkingField.CodeRange);
                 if (fieldCodeText.Contains("INTERP"))
@@ -133,7 +189,7 @@ namespace SnapTestDocuments
 
         public void Set<P>(P newEntry) where P : T
         {
-            if(!items.ContainsKey(typeof(P)))
+            if (!items.ContainsKey(typeof(P)))
             {
                 items.Add(typeof(P), newEntry);
             }
@@ -165,6 +221,7 @@ namespace SnapTestDocuments
                 if (dragonWork == null)
                 {
                     dragonWork = new DragonAccessManagerCmn(this);
+                    dragonWork.Init();
                     manager.Set((T)(ITextEditManager)dragonWork);
                     return (T)(ITextEditManager)dragonWork;
                 }
@@ -172,7 +229,7 @@ namespace SnapTestDocuments
 
             if (typeof(T) == typeof(IInterpSectionsManager))
             {
-                if(sectioner == null)
+                if (sectioner == null)
                 {
                     sectioner = new SectionManagerImpl(this);
                     manager.Set((T)(ITextEditManager)sectioner);
@@ -181,14 +238,157 @@ namespace SnapTestDocuments
             }
 
 
-             return (T)(ITextEditManager)null;
+            return (T)(ITextEditManager)null;
         }
 
         public DragonAccessManagerCmn getDragon()
         {
             return dragonWork;
         }
+
+        DictSnapControl GetFocusedTextControl()
+        {
+            var cc = SnapControl as DictSnapControl;
+
+            return cc;
+        }
     }
+
+    public class DocPos : IDocumentPosition
+    {
+        DocumentRange workItem;
+        bool begin;
+        public DocPos(DocumentRange fieldRange, bool begin)
+        {
+            workItem = fieldRange;
+        }
+
+        public int Position => begin ? workItem.Start.ToInt() : workItem.End.ToInt();
+    }
+
+    public class DocFields : IFieldCollection
+    {
+        FieldCollection workFields;
+        public DocFields(FieldCollection fields)
+        {
+            workFields = fields;
+        }
+
+        public int Count => workFields.Count;
+
+        public IEnumerator<IField> GetEnumerator()
+        {
+            return workFields.Select(x => new IField(x)).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        public IField this[int index] => new IField(workFields[index]);
+    }
+
+    public class DocContent : ISubDocument
+    {
+        Document doc;
+        public DocContent(Document workDoc)
+        {
+            doc = workDoc;
+        }
+
+        public IFieldCollection Fields => new DocFields(doc.Fields);
+
+        public bool Equals(ISubDocument other)
+        {
+            return this == other;
+        }
+    }
+
+    public class DocRange : IDocumentRange
+    {
+        Field snapField;
+        public DocRange(Field native)
+        {
+            snapField = native;
+        }
+        public IDocumentPosition Start => new DocPos(snapField.ResultRange, true);
+
+
+        public IDocumentPosition End => new DocPos(snapField.ResultRange, false);
+
+        public int Length => snapField.ResultRange.Length;
+    }
+
+    public class SnapFieldInfo : ITextFieldInfo
+    {
+        Field nativeField;
+        Document workDocument;
+        public SnapFieldInfo(Field field, Document document)
+        {
+            nativeField = field;
+            workDocument = document;
+        }
+        IField ITextFieldInfo.Field => new IField(nativeField);
+
+        IDocumentRange ITextFieldInfo.ResultRange => new DocRange(nativeField);
+
+        ISubDocument ITextFieldInfo.Document => new DocContent(workDocument);
+    }
+
+    public static class SnapFieldTools
+    {
+        public static bool IsValidField(this IField field)
+        {
+            var check = (field.FieldNative as DevExpress.XtraRichEdit.API.Native.Implementation.NativeField)?.IsValid;
+            if (check.HasValue)
+            {
+                if (check.Value == false)
+                {
+                    if ((field.FieldNative as DevExpress.XtraRichEdit.API.Native.Implementation.NativeField)?.ResultRange.Length > 0)
+                    {
+                        return false;
+                    }
+                    return true;
+                }
+                return check.Value;
+            }
+            return false;
+        }
+
+        public static bool IsValidField(this ITextFieldInfo fieldInfo)
+        {
+            var check = (fieldInfo.Field.FieldNative as DevExpress.XtraRichEdit.API.Native.Implementation.NativeField)?.IsValid;
+            if (check.HasValue)
+            {
+                if (check.Value == false)
+                {
+
+                    var fieldChecked = fieldInfo.Document.Fields.Where(checkField => checkField == fieldInfo.Field);
+                    if (fieldChecked.Count() > 0)
+                    {
+                        // exists but empty
+                        return true;
+                    }
+                }
+                return check.Value;
+            }
+            // not found or invalid
+            return false;
+        }
+
+
+        public static DevExpress.XtraRichEdit.API.Native.Field ToSnap(this IField field)
+        {
+            if (field == null) return null;
+            return (field).FieldNative;
+        }
+
+        public static ITextFieldInfo GetTextFieldInfo(this Field field, SnapDocument subDocument) => new SnapFieldInfo(field, subDocument);
+
+    }
+
+
 
     public class SnapDocumentRangeTools
     {
@@ -235,7 +435,8 @@ namespace SnapTestDocuments
             }
             subDocument.CancelUpdateRangePermissions(rangesCol);
 
-            return isEditable;
+
+            return true;
         }
     }
 }

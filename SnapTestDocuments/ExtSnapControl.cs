@@ -2,6 +2,7 @@
 using DevExpress.XtraRichEdit.SpellChecker;
 using DevExpress.XtraSpellChecker.Native;
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Permissions;
 using System.Windows.Forms;
@@ -11,12 +12,12 @@ namespace SnapTestDocuments
     public class ExtSnapControl : DevExpress.Snap.SnapControl
     {
 
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
         private ISnapReportContext _currentContext;
 
-
-        public Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);
-        public Tuple<int, int> currentselectionPair = new Tuple<int, int>(0, 0);
+        private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);  // start, end
+        private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);  // start, end
+        private string cachedText;
 
         protected override CreateParams CreateParams
         {
@@ -34,6 +35,10 @@ namespace SnapTestDocuments
         public ExtSnapControl()
         {
             ControlToSpellCheckTextControllerMapper.Instance.Register(typeof(ExtSnapControl), typeof(RichEditSpellCheckController));
+            this.ContentChanged -= ExtSnapControl_ContentChanged;
+            this.ContentChanged += ExtSnapControl_ContentChanged;
+            this.SelectionChanged -= ExtSnapControl_SelectionChanged;
+            this.SelectionChanged += ExtSnapControl_SelectionChanged;
         }
 
         public ISnapReportContext SetContext
@@ -44,23 +49,63 @@ namespace SnapTestDocuments
             }
         }
 
+        private void ReplaceText(string messageText)
+        {
+            var caretPos = Document.Selection;
+            bool extendSelection = false;
+            if (lastselectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2 && requestSelectPair.Item1 == caretPos.Start.ToInt())
+            {
+                caretPos = Document.CreateRange(lastselectionPair.Item1, Math.Abs(lastselectionPair.Item2 - lastselectionPair.Item1));
+            }
+            string textToReplace = cachedText.Substring(caretPos.Start.ToInt(), caretPos.End.ToInt() - caretPos.Start.ToInt());
+            log.InfoFormat("Replace selected text: '{0}', with  '{1}' on text '{2}'", textToReplace, messageText, cachedText);
+            if (!String.IsNullOrEmpty(textToReplace))
+            {
+                if (char.IsWhiteSpace(textToReplace[0]) != char.IsWhiteSpace(messageText[0]))
+                {
+                    extendSelection = true;
+                }
+            }
+            if (extendSelection)
+            {
+                caretPos = Document.CreateRange(Document.CreatePosition(caretPos.Start.ToInt()), caretPos.Length);
+            }
+            SubDocument docFragment = caretPos.BeginUpdateDocument();
+            try
+            {
+                docFragment.BeginUpdate();
+                messageText = CalculateCachedTextChanges(caretPos, messageText);
+                docFragment.Replace(caretPos, messageText);
+            }
+            finally
+            {
+                docFragment.EndUpdate();
+                caretPos.EndUpdateDocument(docFragment);
+                cachedText = Text;
+                Document.CaretPosition = caretPos.End;
+                lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
+            }
+        }
+
         private Tuple<int, int> SetSelect(int wparam, int lparam)
         {
+
             int minPos = Math.Min(wparam, lparam);
             int maxPos = Math.Max(wparam, lparam);
-            if (maxPos == minPos)
-            {
-                maxPos += 1;
-                minPos += 1;
-            }
+            log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
             if (minPos >= Document.Length)
             {
                 minPos = Document.Length - 1;
                 maxPos = Document.Length - 1;
             }
-            if (Math.Min(maxPos, minPos) >= 0)
+
+            if (Math.Abs(maxPos - minPos) > 0)
             {
-                Document.Selection = Document.CreateRange(Document.CreatePosition(minPos), maxPos - minPos);
+                Document.Selection = Document.CreateRange(Document.CreatePosition(Math.Min(maxPos,minPos)), Math.Abs(maxPos - minPos));
+            }
+            else if (Math.Abs(maxPos - minPos) == 0)
+            {
+                Document.CaretPosition = Document.CreatePosition(minPos + 1);
             }
             return new Tuple<int, int>(minPos, maxPos);
         }
@@ -70,11 +115,11 @@ namespace SnapTestDocuments
             switch (m.Msg)
             {
                 case 194:  // EM_REPLACESEL,  replace text in place of current selection given in pair lastselectionPair, also if no selection simply dictates new text.
-                    if (log.IsDebugEnabled)
+                    if (log.IsInfoEnabled)
                     {
-                        log.Debug(string.Format("Replace selected text: '{0}', Undo: {1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
+                        log.Info(string.Format("Replace selected text: '{0}', Undo: {1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
                     }
-
+                    
                     string messageText = Marshal.PtrToStringAuto(m.LParam);
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
@@ -82,45 +127,28 @@ namespace SnapTestDocuments
                     }
                     else
                     {
-                        var caretPos = Document.Selection;
-                        if (caretPos.Start.ToInt() != currentselectionPair.Item1)
-                        {
-                            caretPos = Document.CreateRange(Document.CreatePosition(lastselectionPair.Item1), lastselectionPair.Item2);
-                        }
-                        SubDocument docFragment = caretPos.BeginUpdateDocument();
-                        try
-                        {
-                            BeginUpdate();
-                            docFragment.Replace(caretPos, messageText);
-                        }
-                        finally
-                        {
-                            caretPos.EndUpdateDocument(docFragment);
-                            EndUpdate();
-                        }
+                        ReplaceText(messageText);
                     }
                     break;
                 case 176: //EM_GETSEL - returns current selection merked in document
                     Tuple<int, int> lastCaretPos = null;
-                    // Temporary. The order is frozen in Report Sign Out Entry when Interpretation section is added to Snap Test Specific repot template. 
+
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
                         lastCaretPos = _currentContext.GetManager<IDragonAccessManager>().GetSel();
                     }
-                    else if (Document.Selection != null)
+                    else
                     {
-                        var docSelection = Document.Selection;
-                        int startPos = docSelection.Start.ToInt();
-                        int endPos = docSelection.End.ToInt();
-                        lastCaretPos = new Tuple<int, int>(startPos, endPos - startPos);
+                        lastCaretPos = lastselectionPair;
                     }
+
                     if (m.WParam != IntPtr.Zero)
                     {
                         Marshal.WriteInt16(m.WParam, Convert.ToInt16(lastCaretPos.Item1));
                     }
                     if (m.LParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt16(m.LParam, Convert.ToInt16(lastCaretPos.Item1 + lastCaretPos.Item2));
+                        Marshal.WriteInt16(m.LParam, Convert.ToInt16(lastCaretPos.Item2));
                     }
                     if (lastCaretPos.Item1 > 65535)
                     {
@@ -132,42 +160,20 @@ namespace SnapTestDocuments
                     }
                     Int32 retVal = Convert.ToInt16(lastCaretPos.Item1) + (Convert.ToInt16(lastCaretPos.Item2) << 16);
                     m.Result = (IntPtr)retVal;
+                    log.InfoFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt16(m.WParam), Marshal.ReadInt16(m.LParam), (int)m.Result);
                     break;
                 case 177: //EM_SETSEL - sets Selection marker by positions provided in m.Wparam i m.LParam - store previous selection, 
                           // because Dragon sets cursor after previous selected range just before replacing text
-                    Tuple<int, int> lastSelectPos = null;
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
-                        lastSelectPos = _currentContext.GetManager<IDragonAccessManager>().GetSel();
+                        requestSelectPair = _currentContext.GetManager<IDragonAccessManager>().SetSel((int)m.WParam, (int)m.LParam);
                     }
                     else
                     {
-                        var docSelection = Document.Selection;
-                        int startPos = docSelection.Start.ToInt();
-                        int endPos = docSelection.End.ToInt();
-                        lastSelectPos = new Tuple<int, int>(startPos, endPos);
+                        requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam);
                     }
-                    lastselectionPair = new Tuple<int, int>(lastSelectPos.Item1, Math.Abs(lastSelectPos.Item2 - lastSelectPos.Item1));
-                    if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
-                    {
-                        _currentContext.GetManager<IDragonAccessManager>().SetSel((int)m.WParam, (int)m.LParam);
-                    }
-                    else
-                    {
-                        SetSelect((int)m.WParam, (int)m.LParam);
-                    }
-                    currentselectionPair = new Tuple<int, int>((int)m.WParam, Math.Abs((int)m.LParam - (int)m.WParam));
-
-                    if (lastselectionPair == currentselectionPair)
-                    {
-                        m.Result = (IntPtr)0;
-                    }
-                    else
-                    {
-                        m.Result = (IntPtr)1;
-                    }
-
-                    log.InfoFormat("Updated Selection:  old: {0} new: {1} - result:{2}", lastselectionPair, currentselectionPair, m.Result);
+                    m.Result = (IntPtr)1;
+                    log.InfoFormat("Updated Selection:  old: {0} new: {1} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
                     break;
                 case 135: //WM_GETDLGCODE
                     m.Result = (IntPtr)0x89;
@@ -176,14 +182,14 @@ namespace SnapTestDocuments
                     m.Result = (IntPtr)0x1;
                     break;
                 case 13: // WM_GETTEXT - 
-                    string textBuff = String.Empty;
+                    string textBuff;
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
                         textBuff = _currentContext.GetManager<IDragonAccessManager>().GetText();
                     }
                     else
                     {
-                        textBuff = Text;
+                        textBuff = cachedText;
                     }
                     if (textBuff != null)
                     {
@@ -221,17 +227,13 @@ namespace SnapTestDocuments
                     }
                     else
                     {
-                        string textBuffLen = Text;
+                        if (cachedText == null)
+                        {
+                            cachedText = Text;
+                        }
+                        string textBuffLen = cachedText;
                         textBuffLen = textBuffLen.Replace("\r", String.Empty);
                         m.Result = (IntPtr)textBuffLen.Length;
-                    }
-                    break;
-                case 0xb2:  // WM_GETRECT
-                    if (m.LParam != IntPtr.Zero)
-                    {
-                        var rectObj = ClientRectangle;
-                        Marshal.StructureToPtr(rectObj, m.LParam, false);
-                        m.Result = (IntPtr)1;
                     }
                     break;
                 case 0xd6: //EM_POSFROMCHAR
@@ -313,16 +315,55 @@ namespace SnapTestDocuments
                     case 0xb1:
                         log.Debug(string.Format("Set Selection : from:{0}, to:{1} - ret:{2}", (int)(m.LParam), (int)(m.WParam), (int)m.Result));
                         break;
-                    case 0xb2:
-                        var rECTObj = ClientRectangle;
-                        rECTObj = (System.Drawing.Rectangle)Marshal.PtrToStructure(m.LParam, typeof(System.Drawing.Rectangle));
-                        log.Debug(string.Format("Control Rect {0},{1},{2},{3}", rECTObj.Left, rECTObj.Top, rECTObj.Right, rECTObj.Bottom));
-                        break;
                     default:
                         log.Debug("Base Message processed: " + m.ToString());
                         break;
                 }
             }
+        }
+
+        private string CalculateCachedTextChanges(DocumentRange caretPos, string messageText)
+        {
+            string oldCachedText = cachedText;
+
+            string begin = cachedText.Substring(0, caretPos.Start.ToInt());
+            string end = cachedText.Substring(caretPos.Start.ToInt() + caretPos.Length);
+
+            log.InfoFormat("Cached Text '{0}', begin with {1}, ends with {2}", cachedText, begin, end);
+
+            log.InfoFormat("Update cached text on replacing: old cached '{0}', text to replace '{1}'  at {2} , result '{3}'", oldCachedText, messageText, caretPos.Start.ToInt(), begin + messageText + end);
+            if (begin.Length > 0 && begin.Last() == ' ' && messageText.Length > 0 && messageText.First() == ' ')
+            {
+                log.InfoFormat("Correction '{0}'", messageText.Substring(1));
+                return messageText.Substring(1);
+            }
+            log.InfoFormat("New text '{0}'", messageText.Substring(1));
+            return messageText;
+        }
+
+        private void ExtSnapControl_SelectionChanged(object sender, EventArgs e)
+        {
+            log.Info("ExtSnapControl_SelectionChanged:");
+            
+            var docSelection = Document.Selection;
+            int startPos = docSelection.Start.ToInt();
+            int endPos = docSelection.End.ToInt();
+
+
+            if ((startPos - endPos) >= cachedText.Length)
+            {
+                startPos = 0;
+                endPos = cachedText.Length;
+            }
+
+  
+            log.InfoFormat("ExtSnapControl Current Selection begin:{0}, end:{1}", startPos, endPos);
+            lastselectionPair = new Tuple<int, int>(startPos, endPos);
+        }
+
+        private void ExtSnapControl_ContentChanged(object sender, EventArgs e)
+        {
+            cachedText = Text;
         }
     }
 }
