@@ -9,13 +9,12 @@ namespace SnapTestDocuments
 {
     public class DragonAccessManagerCmn : IDragonAccessManager
     {
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("DragonAccessManagerCmn");
         private DocumentEntityBase currentSelectedInterp = null;
         private ITextFieldInfo currentSectionField = null;
         int currentSectionOffset = 0;
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0); //start, end
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);
-        private Tuple<int, Rectangle> lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
         private string cacheStringText = string.Empty;
 
         private bool replaceLock = false;
@@ -26,6 +25,7 @@ namespace SnapTestDocuments
         {
             this.snapCtrlCtx = snapCtrlCtx;
         }
+        private Tuple<int, Rectangle> lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
 
         public void Clear()
         {
@@ -113,7 +113,11 @@ namespace SnapTestDocuments
             {
                 if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField.Field))
                 {
-                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
+                    var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
+                    textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
+                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange, textOpts);
+                    log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cacheStringText);
+                    cacheStringText = cacheStringText.Replace("\r", string.Empty);
                 }
                 else
                 {
@@ -128,6 +132,7 @@ namespace SnapTestDocuments
             {
                 lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
             }
+            log.InfoFormat("SnapControl_ContentChanged - updated text: '{0}'", cacheStringText);
         }
 
         public bool HasSections()
@@ -169,7 +174,7 @@ namespace SnapTestDocuments
             lock (this)
             {
                 log.DebugFormat("ReplaceText with '{0}'", text);
-                if (!string.IsNullOrEmpty(text))
+
                 {
                     if (this.currentSelectedInterp != null && this.currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
                     {
@@ -199,11 +204,9 @@ namespace SnapTestDocuments
                         }
                         if (SnapRangePermissionsTools.IsDocumentRangeEditableRange(SnapCtrl.Document, selection))
                         {
-                            log.InfoFormat("DragAccMgrCmn Replace Text:'{0}'", text);
-
                             if (selection.End == currentSectionField.Field.ToSnap().ResultRange.End)
                             {
-                                if (cacheStringText.Length > 0 && !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]) && !Char.IsWhiteSpace(text[0]))
+                                if (cacheStringText.Length > 0 && !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]) && text.Length > 0 ? !Char.IsWhiteSpace(text[0]) : false)
                                 {
                                     log.InfoFormat("DragAccMgrCmn Adding space existing text: '{0}', addedText '{1}', lastCharWhiteSpace:{2}, first:{3}", cacheStringText, text, !Char.IsWhiteSpace(cacheStringText[cacheStringText.Length - 1]), !Char.IsWhiteSpace(text[0]));
                                     text = " " + text;
@@ -215,6 +218,7 @@ namespace SnapTestDocuments
                                 docFragment.BeginUpdate();
                                 replaceLock = true;
                                 text = CalculateCachedTextChanges(selection, text);
+                                log.InfoFormat("DragAccMgrCmn Replace final Text:'{0}'", text);
                                 docFragment.Replace(selection, text);
                                 //currentSectionField.Field.ToSnap().Update();
                             }
@@ -363,7 +367,7 @@ namespace SnapTestDocuments
                     log.InfoFormat("Correction '{0}'", messageText.Substring(1));
                     return messageText.Substring(1);
                 }
-                log.InfoFormat("New text '{0}'", messageText.Substring(1));
+                log.InfoFormat("New text '{0}'", messageText.Length > 0 ? messageText.Substring(1) : messageText);
             }
             else
             {

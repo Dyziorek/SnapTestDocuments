@@ -27,13 +27,14 @@ namespace SnapTestDocuments
 
         public DictSnapControl()
         {
+            ControlToSpellCheckTextControllerMapper.Instance.Register(typeof(DictSnapControl), typeof(RichEditSpellCheckController));
             if (!DesignMode)
             {
                 InitControl();
             }
         }
 
-        public void InitControl()
+         public void InitControl()
         {
             ControlToSpellCheckTextControllerMapper.Instance.Register(typeof(DictSnapControl), typeof(RichEditSpellCheckController));
             ContentChanged -= DictSnapControl_ContentChanged;
@@ -172,46 +173,74 @@ namespace SnapTestDocuments
 
         public void GetSelection(ref int start, ref int end)
         {
-            start = lastSelectedPair.Item1;
-            end = lastSelectedPair.Item2 - lastSelectedPair.Item1;
+            if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+            {
+                var selection = _currentContext.GetManager<IDragonAccessManager>().GetSel();
+                start = selection.Item1;
+                end = selection.Item2 - selection.Item1;
+            }
+            else
+            {
+                start = lastSelectedPair.Item1;
+                end = lastSelectedPair.Item2 - lastSelectedPair.Item1;
+            }
         }
 
         public string GetText(int start, int len)
         {
             string returnText;
-            if (len < 0)
+            if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+            {
+                returnText = _currentContext.GetManager<IDragonAccessManager>().GetText();
+            }
+            else
             {
                 returnText = cachedText;
             }
-            else if (start + len > cachedText.Length)
+            if (start + len > returnText.Length)
             {
-                if (start > cachedText.Length)
+                if (start > returnText.Length)
                 {
                     returnText = "";
                 }
                 else
                 { 
-                    returnText = cachedText.Substring(start); 
+                    returnText = returnText.Substring(start); 
                 }
             }
-            else
+            else if (len > 0)
             {
-                returnText = cachedText.Substring(start, len);
+                returnText = returnText.Substring(start, len);
             }
-
+            returnText = returnText.Replace("\r", String.Empty);
             log.InfoFormat("GetText start:{0}, len:{1} return text '{2}'", start, len,  returnText);
             return returnText;
         }
 
         public void SetSelection(int start, int len)
         {
-            lastSelectedPair = SetSelect(start, len);
+            if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+            {
+                lastSelectedPair = _currentContext.GetManager<IDragonAccessManager>().SetSel(start, start + len);
+            }
+            else
+            {
+                lastSelectedPair = SetSelect(start, len);
+            }
         }
 
         public void ReplaceText(int start, int length, string newText)
         {
-            SetSelect(start, length);
-            ReplaceText(newText);
+            if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+            {
+                _currentContext.GetManager<IDragonAccessManager>().SetSel(start, start + length);
+                _currentContext.GetManager<IDragonAccessManager>().ReplaceText(newText);
+            }
+            else
+            {
+                SetSelect(start, length);
+                ReplaceText(newText);
+            }
         }
 
         public Rect GetSelectedTextRect()
@@ -281,14 +310,14 @@ namespace SnapTestDocuments
         {
             log.InfoFormat("Request SetSelect from:{0} length: {1}", start, length);
             int linecounter = 0;
-            int caretPosNormalized = start;
-            for (int charIndex = 0; charIndex < start; charIndex++)
-            {
-                if (cachedText[charIndex].ToString() == "\n")
-                {
-                    linecounter++;
-                }
-            }
+            //int caretPosNormalized = start;
+            //for (int charIndex = 0; charIndex < start; charIndex++)
+            //{
+            //    if (cachedText[charIndex].ToString() == "\n")
+            //    {
+            //        linecounter++;
+            //    }
+            //}
 
             if (length > 0)
             {

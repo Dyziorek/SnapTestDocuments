@@ -59,7 +59,7 @@ namespace SnapTestDocuments
             }
             string textToReplace = cachedText.Substring(caretPos.Start.ToInt(), caretPos.End.ToInt() - caretPos.Start.ToInt());
             log.InfoFormat("Replace selected text: '{0}', with  '{1}' on text '{2}'", textToReplace, messageText, cachedText);
-            if (!String.IsNullOrEmpty(textToReplace))
+            if (!String.IsNullOrEmpty(textToReplace) && !String.IsNullOrEmpty(messageText))
             {
                 if (char.IsWhiteSpace(textToReplace[0]) != char.IsWhiteSpace(messageText[0]))
                 {
@@ -214,6 +214,7 @@ namespace SnapTestDocuments
                         {
                             m.Result = IntPtr.Zero;
                         }
+                        log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
                     }
                     else
                     {
@@ -337,7 +338,9 @@ namespace SnapTestDocuments
                 log.InfoFormat("Correction '{0}'", messageText.Substring(1));
                 return messageText.Substring(1);
             }
-            log.InfoFormat("New text '{0}'", messageText.Substring(1));
+            
+            log.InfoFormat("New text '{0}'", !String.IsNullOrEmpty(messageText) ? messageText.Substring(1) : "Empty String");
+            
             return messageText;
         }
 

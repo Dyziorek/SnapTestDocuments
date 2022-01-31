@@ -18,8 +18,14 @@ namespace SnapTestDocuments
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            var appSettings = System.Configuration.ConfigurationManager.AppSettings;
+            string result = appSettings["ActiveSnapControl"] ?? "ExtSnapControl";
 
-            Session.SharedSession.Open("ddus", _organizationToken, _partnerGuid, "SnapTestDocuments");
+            if (result == "DictSnapControl")
+            {
+                Session.SharedSession.Open("ddus", _organizationToken, _partnerGuid, "SnapTestDocuments");
+            }
+
             Application.Run(new SnapControlForm());
         }
     }

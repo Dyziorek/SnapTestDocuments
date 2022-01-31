@@ -51,7 +51,7 @@ namespace SnapTestDocuments
             this.btnSection = new System.Windows.Forms.Button();
             this.lbSections = new System.Windows.Forms.ListBox();
             this.button1 = new System.Windows.Forms.Button();
-            this.snapControl2 = new DictSnapControl();
+            this.snapControl2 = new ExtSnapControl();
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -324,7 +324,7 @@ namespace SnapTestDocuments
         private System.Windows.Forms.Button btnSection;
         private System.Windows.Forms.ListBox lbSections;
         private System.Windows.Forms.Button button1;
-        private DictSnapControl snapControl2;
+        private DevExpress.Snap.SnapControl snapControl2;
     }
 }
 
