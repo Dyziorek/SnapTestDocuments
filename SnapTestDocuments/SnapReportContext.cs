@@ -416,12 +416,14 @@ namespace SnapTestDocuments
         public static bool IsDocumentRangeEditableRange(SubDocument subDocument, DocumentRange docRange)
         {
             if (subDocument == null || docRange == null) return false;
+            bool isEditable = false;
 
             RangePermissionCollection rangesCol = subDocument.BeginUpdateRangePermissions();
             foreach (RangePermission rangePerm in rangesCol)
             {
                 if (rangePerm.UserName == "Regular User" && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(rangePerm.Range, docRange))
                 {
+                    isEditable = true;
                     break;
                 }
             }
