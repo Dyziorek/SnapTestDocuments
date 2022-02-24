@@ -17,7 +17,6 @@ namespace SnapTestDocuments
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);
         private string cacheStringText = string.Empty;
 
-        private bool replaceLock = false;
         protected ISnapCtrlContext snapCtrlCtx;
         protected DevExpress.Snap.SnapControl SnapCtrl { get { return snapCtrlCtx.SnapControl; } }
 
@@ -216,7 +215,6 @@ namespace SnapTestDocuments
                             try
                             {
                                 docFragment.BeginUpdate();
-                                replaceLock = true;
                                 text = CalculateCachedTextChanges(selection, text);
                                 log.InfoFormat("DragAccMgrCmn Replace final Text:'{0}'", text);
                                 docFragment.Replace(selection, text);
@@ -240,7 +238,6 @@ namespace SnapTestDocuments
                                 }
 
                                 cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
-                                replaceLock = false;
                                 log.InfoFormat("DragAccMgrCmn Whole Section Text after replace:'{0}'", cacheStringText);
                             }
 

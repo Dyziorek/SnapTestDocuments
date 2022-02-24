@@ -36,11 +36,9 @@ namespace SnapTestDocuments
             this.textBox1 = new SnapTestDocuments.ExtTextControl();
             this.label1 = new System.Windows.Forms.Label();
             this.snapDockManager1 = new DevExpress.Snap.Extensions.SnapDockManager(this.components);
+            this.snapControl2 = new SnapTestDocuments.ExtSnapControl();
             this.btnSaveDoc = new System.Windows.Forms.Button();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
-            this.splitContainer2 = new System.Windows.Forms.SplitContainer();
-            this.rulerBar1 = new TXTextControl.RulerBar();
-            this.textControl1 = new SnapTestDocuments.ExtTxTextControl();
             this.textBox2 = new System.Windows.Forms.TextBox();
             this.snapDocumentManager1 = new DevExpress.Snap.Extensions.SnapDocumentManager(this.components);
             this.noDocumentsView1 = new DevExpress.XtraBars.Docking2010.Views.NoDocuments.NoDocumentsView(this.components);
@@ -51,16 +49,11 @@ namespace SnapTestDocuments
             this.btnSection = new System.Windows.Forms.Button();
             this.lbSections = new System.Windows.Forms.ListBox();
             this.button1 = new System.Windows.Forms.Button();
-            this.snapControl2 = new ExtSnapControl();
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
-            this.splitContainer2.Panel1.SuspendLayout();
-            this.splitContainer2.Panel2.SuspendLayout();
-            this.splitContainer2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.snapDocumentManager1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.noDocumentsView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.tabbedView1)).BeginInit();
@@ -117,6 +110,16 @@ namespace SnapTestDocuments
             "DevExpress.XtraBars.FluentDesignSystem.FluentDesignFormControl",
             "DevExpress.XtraBars.ToolbarForm.ToolbarFormControl"});
             // 
+            // snapControl2
+            // 
+            this.snapControl2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.snapControl2.Location = new System.Drawing.Point(0, 0);
+            this.snapControl2.Name = "snapControl2";
+            this.snapControl2.Options.DocumentCapabilities.TrackChanges = DevExpress.XtraRichEdit.DocumentCapability.Disabled;
+            this.snapControl2.Options.SnapMailMergeVisualOptions.DataSourceName = null;
+            this.snapControl2.Size = new System.Drawing.Size(909, 578);
+            this.snapControl2.TabIndex = 0;
+            // 
             // btnSaveDoc
             // 
             this.btnSaveDoc.Location = new System.Drawing.Point(1043, 26);
@@ -137,7 +140,7 @@ namespace SnapTestDocuments
             // 
             // splitContainer1.Panel1
             // 
-            this.splitContainer1.Panel1.Controls.Add(this.splitContainer2);
+            this.splitContainer1.Panel1.Controls.Add(this.snapControl2);
             // 
             // splitContainer1.Panel2
             // 
@@ -145,45 +148,6 @@ namespace SnapTestDocuments
             this.splitContainer1.Size = new System.Drawing.Size(1206, 578);
             this.splitContainer1.SplitterDistance = 909;
             this.splitContainer1.TabIndex = 5;
-            // 
-            // splitContainer2
-            // 
-            this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer2.Location = new System.Drawing.Point(0, 0);
-            this.splitContainer2.Name = "splitContainer2";
-            this.splitContainer2.Orientation = System.Windows.Forms.Orientation.Horizontal;
-            // 
-            // splitContainer2.Panel1
-            // 
-            this.splitContainer2.Panel1.Controls.Add(this.snapControl2);
-            // 
-            // splitContainer2.Panel2
-            // 
-            this.splitContainer2.Panel2.Controls.Add(this.rulerBar1);
-            this.splitContainer2.Panel2.Controls.Add(this.textControl1);
-            this.splitContainer2.Size = new System.Drawing.Size(909, 578);
-            this.splitContainer2.SplitterDistance = 291;
-            this.splitContainer2.TabIndex = 1;
-            // 
-            // rulerBar1
-            // 
-            this.rulerBar1.Dock = System.Windows.Forms.DockStyle.Top;
-            this.rulerBar1.Location = new System.Drawing.Point(0, 0);
-            this.rulerBar1.Name = "rulerBar1";
-            this.rulerBar1.Size = new System.Drawing.Size(909, 25);
-            this.rulerBar1.TabIndex = 1;
-            this.rulerBar1.Text = "rulerBar1";
-            // 
-            // textControl1
-            // 
-            this.textControl1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.textControl1.Font = new System.Drawing.Font("Arial", 10F);
-            this.textControl1.Location = new System.Drawing.Point(0, 0);
-            this.textControl1.Name = "textControl1";
-            this.textControl1.RulerBar = this.rulerBar1;
-            this.textControl1.Size = new System.Drawing.Size(909, 283);
-            this.textControl1.TabIndex = 0;
-            this.textControl1.Text = "textControl1";
             // 
             // textBox2
             // 
@@ -278,10 +242,6 @@ namespace SnapTestDocuments
             this.splitContainer1.Panel2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
-            this.splitContainer2.Panel1.ResumeLayout(false);
-            this.splitContainer2.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
-            this.splitContainer2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.snapDocumentManager1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.noDocumentsView1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.tabbedView1)).EndInit();
@@ -306,14 +266,11 @@ namespace SnapTestDocuments
         private System.Windows.Forms.TextBox textBox2;
         private DevExpress.Utils.Behaviors.BehaviorManager behaviorManager1;
         private System.Windows.Forms.Button btnDocSetup;
-        private System.Windows.Forms.SplitContainer splitContainer2;
-        private ExtTxTextControl textControl1;
         private System.Windows.Forms.Button btnPasteText;
-        private TXTextControl.RulerBar rulerBar1;
         private System.Windows.Forms.Button btnSection;
         private System.Windows.Forms.ListBox lbSections;
         private System.Windows.Forms.Button button1;
-        private DevExpress.Snap.SnapControl snapControl2;
+        private ExtSnapControl snapControl2;
     }
 }
 
