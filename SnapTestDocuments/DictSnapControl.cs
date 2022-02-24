@@ -323,9 +323,13 @@ namespace SnapTestDocuments
             {
                 Document.Selection = Document.CreateRange(Document.CreatePosition(start - linecounter), length);
             }
-            else 
+            else if (length == 0) 
             {
                 Document.CaretPosition = Document.CreatePosition(start - linecounter);
+            }
+            else
+            {
+                Document.Selection = Document.CreateRange(Document.Range.Start, Document.Range.Length);
             }
             return new Tuple<int, int>(start, start + length);
         }

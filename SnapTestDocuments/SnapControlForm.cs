@@ -117,10 +117,10 @@ namespace SnapTestDocuments
             // textBox1
             // 
             this.textBox1.Font = new System.Drawing.Font("Arial", 10F);
-            this.textBox1.Location = new System.Drawing.Point(27, 26);
+            this.textBox1.Location = new System.Drawing.Point(6, 26);
             this.textBox1.Multiline = true;
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(807, 83);
+            this.textBox1.Size = new System.Drawing.Size(828, 79);
             this.textBox1.TabIndex = 1;
             // 
             // label1
@@ -393,10 +393,10 @@ namespace SnapTestDocuments
             // textBox1
             // 
             this.textBox1.Font = new System.Drawing.Font("Arial", 10F);
-            this.textBox1.Location = new System.Drawing.Point(27, 26);
+            this.textBox1.Location = new System.Drawing.Point(6, 26);
             this.textBox1.Multiline = true;
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(807, 83);
+            this.textBox1.Size = new System.Drawing.Size(828, 79);
             this.textBox1.TabIndex = 1;
             // 
             // label1
@@ -649,7 +649,9 @@ namespace SnapTestDocuments
         private void BntOpen_Click(object sender, EventArgs e)
         {
             openFileDialog1.DefaultExt = "snx";
+            openFileDialog1.Filter = "rtf files (*.rtf)|*.rtf|snx files (*.snx)|*.snx|All files (*.*)|*.*";
             openFileDialog1.Title = "Open Snaps";
+            bool success = false;
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
                 using (FileStream fstrm = new FileStream(openFileDialog1.FileName, FileMode.Open))
@@ -666,10 +668,19 @@ namespace SnapTestDocuments
                         textControl1.Load(System.IO.File.ReadAllText(basePath + ".rtf"), TXTextControl.StringStreamType.RichTextFormat);
                     }
                 }
+                
 
                 textBox1.Text = openFileDialog1.FileName;
 
-                snapControl2.LoadDocument(textBox1.Text);
+                
+                if (textBox1.Text.Contains("snx"))
+                {
+                    success = snapControl2.LoadDocument(textBox1.Text);
+                }
+                else if (textBox1.Text.Contains("rtf"))
+                {
+                    success = snapControl2.LoadDocument(textBox1.Text, DevExpress.XtraRichEdit.DocumentFormat.Rtf);
+                }
                 snapControl2.Options.Bookmarks.Visibility = DevExpress.XtraRichEdit.RichEditBookmarkVisibility.Visible;
                 if (context == null && ActiveSnapControl != "SnapControl")
                 {
@@ -692,9 +703,15 @@ namespace SnapTestDocuments
                 }
                 lbSections.Items.Clear();
             }
-
-            XDocument snDocument = GetDocumentFromPackage(memoryStream);
-            FilTreeView(snDocument);
+            if (success && textBox1.Text.Contains("snx"))
+            {
+                XDocument snDocument = GetDocumentFromPackage(memoryStream);
+                FilTreeView(snDocument);
+            }
+            else if (textBox1.Text.Contains("rtf"))
+            {
+                textBox2.Text = string.Format("Loaded RTF : {0} path {1}", success, textBox1.Text);
+            }
         }
 
         private void FilTreeView(XDocument snDocument)

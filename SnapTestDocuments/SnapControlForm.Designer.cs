@@ -84,16 +84,16 @@ namespace SnapTestDocuments
             // textBox1
             // 
             this.textBox1.Font = new System.Drawing.Font("Arial", 10F);
-            this.textBox1.Location = new System.Drawing.Point(27, 26);
+            this.textBox1.Location = new System.Drawing.Point(6, 26);
             this.textBox1.Multiline = true;
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(807, 83);
+            this.textBox1.Size = new System.Drawing.Size(828, 79);
             this.textBox1.TabIndex = 1;
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(27, 13);
+            this.label1.Location = new System.Drawing.Point(3, 9);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(121, 13);
             this.label1.TabIndex = 2;
@@ -252,17 +252,6 @@ namespace SnapTestDocuments
             this.button1.Text = "Record";
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.btnSection_Click);
-            // 
-            // snapControl2
-            // 
-            this.snapControl2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.snapControl2.Location = new System.Drawing.Point(0, 0);
-            this.snapControl2.Name = "snapControl2";
-            this.snapControl2.Options.DocumentCapabilities.TrackChanges = DevExpress.XtraRichEdit.DocumentCapability.Disabled;
-            this.snapControl2.Options.SnapMailMergeVisualOptions.DataSourceName = null;
-            this.snapControl2.Size = new System.Drawing.Size(909, 291);
-            this.snapControl2.TabIndex = 0;
-            this.snapControl2.Text = "snapControl2";
             // 
             // SnapControlForm
             // 

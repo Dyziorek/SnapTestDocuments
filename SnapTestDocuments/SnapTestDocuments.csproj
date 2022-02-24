@@ -86,8 +86,9 @@
     <Reference Include="DevExpress.XtraBars.v20.1, Version=20.1.7.0, Culture=neutral, PublicKeyToken=b88d1754d700e49a, processorArchitecture=MSIL" />
     <Reference Include="DevExpress.XtraEditors.v20.1, Version=20.1.7.0, Culture=neutral, PublicKeyToken=b88d1754d700e49a" />
     <Reference Include="DevExpress.XtraRichEdit.v20.1, Version=20.1.7.0, Culture=neutral, PublicKeyToken=b88d1754d700e49a, processorArchitecture=MSIL" />
-    <Reference Include="Nuance.SpeechAnywhere">
-      <HintPath>D:\DragonSDKv2\bin\Nuance.SpeechAnywhere.dll</HintPath>
+    <Reference Include="Nuance.SpeechAnywhere, Version=3.10.2593.101, Culture=neutral, PublicKeyToken=7ab515a4ec68052d, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>bin\Deploy\Nuance.SpeechAnywhere.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />

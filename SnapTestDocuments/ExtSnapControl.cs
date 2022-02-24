@@ -9,6 +9,7 @@ using System.Windows.Forms;
 
 namespace SnapTestDocuments
 {
+
     public class ExtSnapControl : DevExpress.Snap.SnapControl
     {
 
@@ -18,6 +19,27 @@ namespace SnapTestDocuments
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);  // start, end
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);  // start, end
         private string cachedText;
+        IntPtr hOldFont = IntPtr.Zero;
+        IntPtr oldRectPtr = IntPtr.Zero;
+        System.Drawing.Rectangle rectData = System.Drawing.Rectangle.Empty;
+        [System.Runtime.InteropServices.DllImport("GDI32.dll")]
+        public static extern bool DeleteObject(IntPtr objectHandle);
+        [StructLayout (LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+            public RECT(int left, int top, int right, int bottom)
+            {
+                Left = left;
+                Top = top;
+                Right = right;
+                Bottom = bottom;
+            }
+        }
+
 
         protected override CreateParams CreateParams
         {
@@ -41,6 +63,15 @@ namespace SnapTestDocuments
             this.SelectionChanged += ExtSnapControl_SelectionChanged;
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (hOldFont != IntPtr.Zero)
+            {
+                DeleteObject(hOldFont);
+            }
+        }
+
         public ISnapReportContext SetContext
         {
             set
@@ -53,7 +84,7 @@ namespace SnapTestDocuments
         {
             var caretPos = Document.Selection;
             bool extendSelection = false;
-            if (lastselectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2 && requestSelectPair.Item1 == caretPos.Start.ToInt())
+            if (lastselectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2)
             {
                 caretPos = Document.CreateRange(lastselectionPair.Item1, Math.Abs(lastselectionPair.Item2 - lastselectionPair.Item1));
             }
@@ -82,14 +113,13 @@ namespace SnapTestDocuments
                 docFragment.EndUpdate();
                 caretPos.EndUpdateDocument(docFragment);
                 cachedText = Text;
-                Document.CaretPosition = caretPos.End;
+                Document.CaretPosition = docFragment.Range.End;
                 lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
             }
         }
 
         private Tuple<int, int> SetSelect(int wparam, int lparam)
         {
-
             int minPos = Math.Min(wparam, lparam);
             int maxPos = Math.Max(wparam, lparam);
             log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
@@ -101,7 +131,14 @@ namespace SnapTestDocuments
 
             if (Math.Abs(maxPos - minPos) > 0)
             {
-                Document.Selection = Document.CreateRange(Document.CreatePosition(Math.Min(maxPos,minPos)), Math.Abs(maxPos - minPos));
+                if (minPos == -1)
+                {
+                    Document.Selection = Document.CreateRange(Document.Range.Start, Document.Range.Length);
+                }
+                else
+                {
+                    Document.Selection = Document.CreateRange(Document.CreatePosition(Math.Min(maxPos, minPos)), Math.Abs(maxPos - minPos));
+                }
             }
             else if (Math.Abs(maxPos - minPos) == 0)
             {
@@ -181,6 +218,30 @@ namespace SnapTestDocuments
                 case 0xb8: //EM_GETMODIFY
                     m.Result = (IntPtr)0x1;
                     break;
+                case 0x31:  // WM_GETFONT
+                    IntPtr hNewfont = Font.ToHfont();
+                    m.Result = hNewfont;
+                    DeleteObject(hOldFont);
+                    hOldFont = hNewfont;
+                    break;
+                case 0x2111: // WM_USER + 111 (edit specific info)
+                    m.Result = IntPtr.Zero;
+                    break;
+                case 0xb2: // WM_GETRECT
+                    {
+                        rectData = ClientRectangle;
+                        RECT winRect = new RECT(rectData.X + 4, rectData.Y, rectData.Width - 4, rectData.Height);
+                        IntPtr pnt = Marshal.AllocHGlobal(Marshal.SizeOf(winRect));
+                        Marshal.StructureToPtr(winRect, pnt, false);
+                        m.Result = pnt;
+                        if (oldRectPtr != IntPtr.Zero)
+                        {
+                            Marshal.FreeHGlobal(oldRectPtr);
+                        }
+                        oldRectPtr = pnt;
+                        log.InfoFormat("GetRect: x:{0}, y:{1}, w:{2} ,h:{3}", winRect.Left, winRect.Top, winRect.Bottom, winRect.Right);
+                    }
+                    break;
                 case 13: // WM_GETTEXT - 
                     string textBuff;
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
@@ -251,8 +312,10 @@ namespace SnapTestDocuments
                         {
                             if (Document.Range.Length > (int)m.WParam)
                             {
-                                var docCharPos = Document.CreateRange(Document.Range.Start, (int)m.WParam);
-                                rectObj = GetBoundsFromPosition(docCharPos.End);
+                                var docCharPos = Document.CreatePosition((int)m.WParam);
+                                rectObj = GetBoundsFromPosition(docCharPos);
+                                rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
+                                
                                 m.Result = (IntPtr)(Convert.ToInt16(rectObj.X) + (Convert.ToInt16(rectObj.Y) << 16));
                             }
                             else
@@ -260,11 +323,11 @@ namespace SnapTestDocuments
                                 m.Result = (IntPtr)(-1);
                             }
                         }
-                        if (log.IsDebugEnabled)
+                        if (log.IsInfoEnabled)
                         {
-                            log.Debug(string.Format("Position  C:{0},X:{1},Y:{2}", (int)m.WParam, rectObj.X, rectObj.Y));
+                            log.InfoFormat("Position  C:{0},X:{1},Y:{2}", (int)m.WParam, rectObj.X, rectObj.Y);
                         }
-                        log.Debug("Pos From Char Message processed: " + m.ToString());
+                        log.InfoFormat("Pos From Char Message processed: " + m.ToString());
                     }
                     break;
                 case 0xd7: //EM_CHARFROMPOS
@@ -281,12 +344,82 @@ namespace SnapTestDocuments
                         {
                             CharPos = GetPositionFromPoint(charPos).ToInt();
                         }
-                        if (log.IsDebugEnabled)
+                        if (log.IsInfoEnabled)
                         {
-                            log.Debug(string.Format("Char Pos from Point  C:{0},X:{1},Y:{2}", CharPos, charPos.X, charPos.Y));
+                            log.InfoFormat("Char Pos from Point  C:{0},X:{1},Y:{2}, result{3}", CharPos, charPos.X, charPos.Y, (Convert.ToInt16(CharPos) + (Convert.ToInt16(0) << 16)));
                         }
                         m.Result = (IntPtr)(Convert.ToInt16(CharPos) + (Convert.ToInt16(0) << 16));
 
+                    }
+                    break;
+                case 0xc9:  // EM_LINEFROMCHAR
+                    m.Result = IntPtr.Zero;
+                    if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+                    {
+                        textBuff = _currentContext.GetManager<IDragonAccessManager>().GetText();
+                    }
+                    else
+                    {
+                        textBuff = cachedText;
+                    }
+                    if (textBuff != null)
+                    {
+                        String[] lineparts = textBuff.Split('\n');
+                        if (textBuff.Length < (int)m.WParam)
+                        {
+                            m.Result = (IntPtr)(lineparts.Length - 1);
+                        }
+                        else if (lineparts.Length > 0)
+                        {
+                            int charPos = (int)m.WParam;
+                            int stringTotal = 0;
+                            int lineCounter = lineparts.Count(sum =>
+                            {
+                                stringTotal += sum.Length + 1;
+                                if (stringTotal < charPos)
+                                {
+                                    return true;
+                                }
+                                return false;
+                            });
+
+                            m.Result = (IntPtr)(lineCounter - 1);
+                        }
+                    }
+                    break;
+                case 0xc1:
+                    m.Result = IntPtr.Zero;
+                    if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+                    {
+                        textBuff = _currentContext.GetManager<IDragonAccessManager>().GetText();
+                    }
+                    else
+                    {
+                        textBuff = cachedText;
+                    }
+                    if (textBuff != null)
+                    {
+                        String[] lineparts = textBuff.Split('\n');
+                        if (textBuff.Length < (int)m.WParam)
+                        {
+                            m.Result = (IntPtr)lineparts.LastOrDefault().Length;
+                        }
+                        else if (lineparts.Length > 0)
+                        {
+                            int charPos = (int)m.WParam;
+                            int stringTotal = 0;
+                            int lineCounter = lineparts.Count(sum =>
+                            {
+                                stringTotal += sum.Length + 1;
+                                if (stringTotal < charPos)
+                                {
+                                    return true;
+                                }
+                                return false;
+                            });
+
+                            m.Result = (IntPtr)(lineparts[lineCounter].Length);
+                        }
                     }
                     break;
                 default:
@@ -366,7 +499,11 @@ namespace SnapTestDocuments
 
         private void ExtSnapControl_ContentChanged(object sender, EventArgs e)
         {
-            cachedText = Text;
+            var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
+            textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
+            cachedText = Document.GetText(Document.Range, textOpts);
+            log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
+            cachedText = cachedText.Replace("\r", string.Empty);
         }
     }
 }
