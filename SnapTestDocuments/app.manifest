@@ -19,14 +19,4 @@
       </requestedPrivileges>
     </security>
   </trustInfo>
-  <dependency>
-    <dependentAssembly>
-      <assemblyIdentity type="win32" name="Philips.SpeechMike" version="4.3.430.12" processorArchitecture="*" />
-    </dependentAssembly>
-  </dependency>
-  <dependency>
-    <dependentAssembly>
-      <assemblyIdentity type="win32" name="Nuance.PowerMic" version="121.1.633.2116" processorArchitecture="*" />
-    </dependentAssembly>
-  </dependency>
 </asmv1:assembly>
