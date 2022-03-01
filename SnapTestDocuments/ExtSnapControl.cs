@@ -113,7 +113,7 @@ namespace SnapTestDocuments
                 docFragment.EndUpdate();
                 caretPos.EndUpdateDocument(docFragment);
                 cachedText = Text;
-                Document.CaretPosition = docFragment.Range.End;
+                //Document.CaretPosition = docFragment.Range.End;  //ANDATA
                 lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
             }
         }
@@ -123,12 +123,13 @@ namespace SnapTestDocuments
             int minPos = Math.Min(wparam, lparam);
             int maxPos = Math.Max(wparam, lparam);
             log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
+            
             if (minPos >= Document.Length)
             {
                 minPos = Document.Length - 1;
                 maxPos = Document.Length - 1;
             }
-
+            log.InfoFormat("Request SetSelect from:{0} to: {1}", minPos, maxPos);
             if (Math.Abs(maxPos - minPos) > 0)
             {
                 if (minPos == -1)
@@ -142,7 +143,8 @@ namespace SnapTestDocuments
             }
             else if (Math.Abs(maxPos - minPos) == 0)
             {
-                Document.CaretPosition = Document.CreatePosition(minPos + 1);
+                //Document.CaretPosition = Document.CreatePosition(minPos + 1);
+                Document.CaretPosition = Document.CreatePosition(minPos); //ANDATA
             }
             return new Tuple<int, int>(minPos, maxPos);
         }
@@ -178,14 +180,13 @@ namespace SnapTestDocuments
                     {
                         lastCaretPos = lastselectionPair;
                     }
-
                     if (m.WParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt16(m.WParam, Convert.ToInt16(lastCaretPos.Item1));
+                        Marshal.WriteInt32(m.WParam, Convert.ToInt32(lastCaretPos.Item1)); //ANDATA, Important change
                     }
                     if (m.LParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt16(m.LParam, Convert.ToInt16(lastCaretPos.Item2));
+                        Marshal.WriteInt32(m.LParam, Convert.ToInt32(lastCaretPos.Item2)); //ANDATA, Important change
                     }
                     if (lastCaretPos.Item1 > 65535)
                     {
@@ -207,7 +208,7 @@ namespace SnapTestDocuments
                     }
                     else
                     {
-                        requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam);
+                        requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam); //ANDATA
                     }
                     m.Result = (IntPtr)1;
                     log.InfoFormat("Updated Selection:  old: {0} new: {1} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
@@ -267,7 +268,7 @@ namespace SnapTestDocuments
                             else
                             {
                                 Marshal.Copy(textBuffPtr, 0, m.LParam, textBuffPtr.Length);
-                                Marshal.WriteInt16(m.LParam, textBuffPtr.Length, 0);
+                                Marshal.WriteInt32(m.LParam, textBuffPtr.Length, 0);
                                 m.Result = (IntPtr)(textBuff.Length);
                             }
                         }
@@ -478,7 +479,7 @@ namespace SnapTestDocuments
         }
 
         private void ExtSnapControl_SelectionChanged(object sender, EventArgs e)
-        {
+        {            
             log.Info("ExtSnapControl_SelectionChanged:");
             
             var docSelection = Document.Selection;
@@ -495,6 +496,7 @@ namespace SnapTestDocuments
   
             log.InfoFormat("ExtSnapControl Current Selection begin:{0}, end:{1}", startPos, endPos);
             lastselectionPair = new Tuple<int, int>(startPos, endPos);
+            
         }
 
         private void ExtSnapControl_ContentChanged(object sender, EventArgs e)
