@@ -112,16 +112,20 @@ namespace SnapTestDocuments
             {
                 docFragment.EndUpdate();
                 caretPos.EndUpdateDocument(docFragment);
-                cachedText = Text;
+                ExtSnapControl_ContentChanged(this, EventArgs.Empty);// cachedText = Text.Replace("\r", string.Empty);
                 //Document.CaretPosition = docFragment.Range.End;  //ANDATA
                 lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
             }
         }
 
+
         private Tuple<int, int> SetSelect(int wparam, int lparam)
         {
             int minPos = Math.Min(wparam, lparam);
             int maxPos = Math.Max(wparam, lparam);
+           // var correctedSelection = CorrectSelectionText(minPos, maxPos);
+           // minPos = correctedSelection.Item1;
+           // maxPos = correctedSelection.Item2;
             log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
             
             if (minPos >= Document.Length)
@@ -255,7 +259,7 @@ namespace SnapTestDocuments
                     }
                     if (textBuff != null)
                     {
-                        textBuff = textBuff.Replace("\r", String.Empty);
+                        //textBuff = textBuff.Replace("\r", String.Empty);
                         if (m.WParam.ToInt32() > 0)
                         {
                             var textBuffPtr = System.Text.Encoding.Unicode.GetBytes(textBuff);
@@ -276,6 +280,7 @@ namespace SnapTestDocuments
                         {
                             m.Result = IntPtr.Zero;
                         }
+                        log.InfoFormat("GetText reported: marshal text: {0} - result:{1}", Marshal.PtrToStringAuto(m.LParam), (int)m.Result); 
                         log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
                     }
                     else
@@ -294,9 +299,7 @@ namespace SnapTestDocuments
                         {
                             cachedText = Text;
                         }
-                        string textBuffLen = cachedText;
-                        textBuffLen = textBuffLen.Replace("\r", String.Empty);
-                        m.Result = (IntPtr)textBuffLen.Length;
+                        m.Result = (IntPtr)cachedText.Length;
                     }
                     break;
                 case 0xd6: //EM_POSFROMCHAR
@@ -504,8 +507,37 @@ namespace SnapTestDocuments
             var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
             textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
             cachedText = Document.GetText(Document.Range, textOpts);
-            log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
             cachedText = cachedText.Replace("\r", string.Empty);
+            log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
+        }
+
+        private Tuple<int, int> CorrectSelectionText(int minPos, int maxPos)
+        {
+            Tuple<int, int> correctedPos = new Tuple<int, int>(minPos, maxPos);
+            String[] lineparts = cachedText.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+            if (cachedText.Length < (int)minPos)
+            {
+
+            }
+            else if (lineparts.Length > 0)
+            {
+                int stringTotal = 0;
+                int charPos = (int)minPos;
+                bool LineCounter(string partCount)
+                {
+                    stringTotal += partCount.Length + 1;
+                    if (stringTotal < charPos)
+                    {
+                        return true;
+                    }
+                    return false;
+                }
+                int minLineCounter = lineparts.Count(LineCounter);
+                stringTotal = 0; charPos = maxPos;
+                int maxLineCounter = lineparts.Count(LineCounter);
+                correctedPos = new Tuple<int, int>(minPos - minLineCounter, maxPos - maxLineCounter);
+            }
+            return correctedPos;
         }
     }
 }
