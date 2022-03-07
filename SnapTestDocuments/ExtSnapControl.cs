@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Permissions;
 using System.Windows.Forms;
+using System.Collections.Generic;
 
 namespace SnapTestDocuments
 {
@@ -15,7 +16,7 @@ namespace SnapTestDocuments
 
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
         private ISnapReportContext _currentContext;
-
+        private Dictionary<int, int> mapTextPos = new Dictionary<int, int>();
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);  // start, end
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);  // start, end
         private string cachedText;
@@ -123,32 +124,37 @@ namespace SnapTestDocuments
         {
             int minPos = Math.Min(wparam, lparam);
             int maxPos = Math.Max(wparam, lparam);
-           // var correctedSelection = CorrectSelectionText(minPos, maxPos);
-           // minPos = correctedSelection.Item1;
-           // maxPos = correctedSelection.Item2;
             log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
             
+
             if (minPos >= Document.Length)
             {
                 minPos = Document.Length - 1;
                 maxPos = Document.Length - 1;
             }
             log.InfoFormat("Request SetSelect from:{0} to: {1}", minPos, maxPos);
-            if (Math.Abs(maxPos - minPos) > 0)
+            if (minPos == -1)
             {
-                if (minPos == -1)
+                Document.Selection = Document.CreateRange(Document.Range.Start, Document.Range.Length);
+            }
+            else
+            {
+                if (!mapTextPos.TryGetValue(minPos, out minPos))
                 {
-                    Document.Selection = Document.CreateRange(Document.Range.Start, Document.Range.Length);
+                    minPos = Math.Min(wparam, lparam);
+                }
+                if (!mapTextPos.TryGetValue(maxPos, out maxPos))
+                {
+                    maxPos = Math.Max(wparam, lparam);
+                }
+                if (Math.Abs(maxPos - minPos) == 0)
+                {
+                    Document.CaretPosition = Document.CreatePosition(minPos);
                 }
                 else
                 {
                     Document.Selection = Document.CreateRange(Document.CreatePosition(Math.Min(maxPos, minPos)), Math.Abs(maxPos - minPos));
                 }
-            }
-            else if (Math.Abs(maxPos - minPos) == 0)
-            {
-                //Document.CaretPosition = Document.CreatePosition(minPos + 1);
-                Document.CaretPosition = Document.CreatePosition(minPos); //ANDATA
             }
             return new Tuple<int, int>(minPos, maxPos);
         }
@@ -280,7 +286,6 @@ namespace SnapTestDocuments
                         {
                             m.Result = IntPtr.Zero;
                         }
-                        log.InfoFormat("GetText reported: marshal text: {0} - result:{1}", Marshal.PtrToStringAuto(m.LParam), (int)m.Result); 
                         log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
                     }
                     else
@@ -298,9 +303,11 @@ namespace SnapTestDocuments
                         if (cachedText == null)
                         {
                             cachedText = Text;
+                            MapTextPositions();
                         }
                         m.Result = (IntPtr)cachedText.Length;
                     }
+                    log.InfoFormat("GetTextLengh: {0}", cachedText.Length);
                     break;
                 case 0xd6: //EM_POSFROMCHAR
                     m.Result = (IntPtr)(-1);
@@ -316,7 +323,13 @@ namespace SnapTestDocuments
                         {
                             if (Document.Range.Length > (int)m.WParam)
                             {
-                                var docCharPos = Document.CreatePosition((int)m.WParam);
+                                int position = (int)m.WParam;
+                                if (!mapTextPos.TryGetValue(position, out position))
+                                {
+                                    log.InfoFormat("Unable get correct position req: {0}", (int)m.WParam);
+                                    position = (int)m.WParam;
+                                }
+                                var docCharPos = Document.CreatePosition(position);
                                 rectObj = GetBoundsFromPosition(docCharPos);
                                 rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
                                 
@@ -331,7 +344,6 @@ namespace SnapTestDocuments
                         {
                             log.InfoFormat("Position  C:{0},X:{1},Y:{2}", (int)m.WParam, rectObj.X, rectObj.Y);
                         }
-                        log.InfoFormat("Pos From Char Message processed: " + m.ToString());
                     }
                     break;
                 case 0xd7: //EM_CHARFROMPOS
@@ -368,19 +380,23 @@ namespace SnapTestDocuments
                     }
                     if (textBuff != null)
                     {
+                        int position = (int)m.WParam;
+                        if (!mapTextPos.TryGetValue(position, out position))
+                        {
+                            position = (int)m.WParam;
+                        }
                         String[] lineparts = textBuff.Split('\n');
-                        if (textBuff.Length < (int)m.WParam)
+                        if (textBuff.Length < position)
                         {
                             m.Result = (IntPtr)(lineparts.Length - 1);
                         }
                         else if (lineparts.Length > 0)
                         {
-                            int charPos = (int)m.WParam;
                             int stringTotal = 0;
                             int lineCounter = lineparts.Count(sum =>
                             {
                                 stringTotal += sum.Length + 1;
-                                if (stringTotal < charPos)
+                                if (stringTotal < position)
                                 {
                                     return true;
                                 }
@@ -391,7 +407,7 @@ namespace SnapTestDocuments
                         }
                     }
                     break;
-                case 0xc1:
+                case 0xc1:  // EM_LINELENGTH
                     m.Result = IntPtr.Zero;
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
@@ -427,6 +443,7 @@ namespace SnapTestDocuments
                     }
                     break;
                 default:
+                    //log.Info("Base Message processed: " + m.ToString());
                     base.WndProc(ref m);
                     break;
             }
@@ -507,37 +524,35 @@ namespace SnapTestDocuments
             var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
             textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
             cachedText = Document.GetText(Document.Range, textOpts);
-            cachedText = cachedText.Replace("\r", string.Empty);
+            MapTextPositions();
             log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
         }
 
-        private Tuple<int, int> CorrectSelectionText(int minPos, int maxPos)
+        private void MapTextPositions()
         {
-            Tuple<int, int> correctedPos = new Tuple<int, int>(minPos, maxPos);
+            var dictPosData = new Dictionary<int, int>();
             String[] lineparts = cachedText.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-            if (cachedText.Length < (int)minPos)
+            if (lineparts.Length > 0)
             {
-
-            }
-            else if (lineparts.Length > 0)
-            {
-                int stringTotal = 0;
-                int charPos = (int)minPos;
-                bool LineCounter(string partCount)
+                int sumText = 0;
+                for(int lineIDX = 0; lineIDX < lineparts.Length; lineIDX++)
                 {
-                    stringTotal += partCount.Length + 1;
-                    if (stringTotal < charPos)
+                    string lineText = lineparts[lineIDX];
+ 
+                    for (int charIdx = 0; charIdx < lineText.Length; charIdx++)
                     {
-                        return true;
+                        if (dictPosData.ContainsKey(charIdx + sumText))
+                        {
+                            log.InfoFormat("Wrong update positions idKey: {0}, valKey {1}, character {2}, ", charIdx + sumText, charIdx + sumText - lineIDX, lineText[charIdx]);
+                        }
+                        else
+                            dictPosData.Add(charIdx + sumText, charIdx + sumText - lineIDX);
                     }
-                    return false;
+                    dictPosData.Add(lineText.Length + sumText, lineText.Length + sumText - lineIDX);
+                    sumText += lineText.Length + 1;
                 }
-                int minLineCounter = lineparts.Count(LineCounter);
-                stringTotal = 0; charPos = maxPos;
-                int maxLineCounter = lineparts.Count(LineCounter);
-                correctedPos = new Tuple<int, int>(minPos - minLineCounter, maxPos - maxLineCounter);
             }
-            return correctedPos;
+            mapTextPos = dictPosData;
         }
     }
 }

@@ -142,7 +142,6 @@ namespace SnapTestDocuments
 
         public Field GetSectionField(DocumentEntityBase sectionEntity)
         {
-            log.Debug("Field Section lookup");
             if (sectionEntity?.Type == DocumentEntityTypes.InterpretationSection)
             {
                 foreach (Field checkingField in documentControl.Document.Fields)
@@ -150,7 +149,6 @@ namespace SnapTestDocuments
                     var fieldCodeText = documentControl.Document.GetText(checkingField.CodeRange);
                     if (fieldCodeText.Contains("FUNCTION") && fieldCodeText.Contains(sectionEntity.name))
                     {
-                        log.Debug("Field Section lookup found:" + sectionEntity.name);
                         return checkingField;
                     }
                 }
