@@ -16,10 +16,13 @@ namespace SnapTestDocuments
 
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
         private ISnapReportContext _currentContext;
-        private Dictionary<int, int> mapTextPos = new Dictionary<int, int>();
+        private Dictionary<int, int> mapEditSnapPos = new Dictionary<int, int>();
+        private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);  // start, end
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);  // start, end
         private string cachedText;
+        private string lastcachedText;
+        private int lastTextLength = -1;
         IntPtr hOldFont = IntPtr.Zero;
         IntPtr oldRectPtr = IntPtr.Zero;
         System.Drawing.Rectangle rectData = System.Drawing.Rectangle.Empty;
@@ -139,14 +142,15 @@ namespace SnapTestDocuments
             }
             else
             {
-                if (!mapTextPos.TryGetValue(minPos, out minPos))
+                if (!mapEditSnapPos.TryGetValue(minPos, out minPos))
                 {
                     minPos = Math.Min(wparam, lparam);
                 }
-                if (!mapTextPos.TryGetValue(maxPos, out maxPos))
+                if (!mapEditSnapPos.TryGetValue(maxPos, out maxPos))
                 {
                     maxPos = Math.Max(wparam, lparam);
                 }
+                log.InfoFormat("Mapped setsel orig:{0},{1}, maps{2},{3}", wparam, lparam, minPos, maxPos);
                 if (Math.Abs(maxPos - minPos) == 0)
                 {
                     Document.CaretPosition = Document.CreatePosition(minPos);
@@ -190,13 +194,15 @@ namespace SnapTestDocuments
                     {
                         lastCaretPos = lastselectionPair;
                     }
+                    int firstPos = mapSnapEditPos[lastCaretPos.Item1];
+                    int secondPos = mapSnapEditPos[lastCaretPos.Item2];
                     if (m.WParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt32(m.WParam, Convert.ToInt32(lastCaretPos.Item1)); //ANDATA, Important change
+                        Marshal.WriteInt32(m.WParam, Convert.ToInt32(firstPos)); //ANDATA, Important change
                     }
                     if (m.LParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt32(m.LParam, Convert.ToInt32(lastCaretPos.Item2)); //ANDATA, Important change
+                        Marshal.WriteInt32(m.LParam, Convert.ToInt32(secondPos)); //ANDATA, Important change
                     }
                     if (lastCaretPos.Item1 > 65535)
                     {
@@ -206,9 +212,9 @@ namespace SnapTestDocuments
                     {
                         lastCaretPos = new Tuple<int, int>(lastCaretPos.Item1, 65535 - lastCaretPos.Item1);
                     }
-                    Int32 retVal = Convert.ToInt16(lastCaretPos.Item1) + (Convert.ToInt16(lastCaretPos.Item2) << 16);
+                    Int32 retVal = Convert.ToInt16(firstPos) + (Convert.ToInt16(secondPos) << 16);
                     m.Result = (IntPtr)retVal;
-                    log.InfoFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt16(m.WParam), Marshal.ReadInt16(m.LParam), (int)m.Result);
+                    log.InfoFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt32(m.WParam), Marshal.ReadInt32(m.LParam), (int)m.Result);
                     break;
                 case 177: //EM_SETSEL - sets Selection marker by positions provided in m.Wparam i m.LParam - store previous selection, 
                           // because Dragon sets cursor after previous selected range just before replacing text
@@ -286,7 +292,11 @@ namespace SnapTestDocuments
                         {
                             m.Result = IntPtr.Zero;
                         }
-                        log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
+                        if (!string.Equals(lastcachedText,cachedText))
+                        {
+                            log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
+                            lastcachedText = cachedText;
+                        }
                     }
                     else
                     {
@@ -307,7 +317,11 @@ namespace SnapTestDocuments
                         }
                         m.Result = (IntPtr)cachedText.Length;
                     }
-                    log.InfoFormat("GetTextLengh: {0}", cachedText.Length);
+                    if (lastTextLength != cachedText.Length)
+                    {
+                        log.InfoFormat("GetTextLengh: {0}", cachedText.Length);
+                        lastTextLength = cachedText.Length;
+                    }
                     break;
                 case 0xd6: //EM_POSFROMCHAR
                     m.Result = (IntPtr)(-1);
@@ -324,7 +338,7 @@ namespace SnapTestDocuments
                             if (Document.Range.Length > (int)m.WParam)
                             {
                                 int position = (int)m.WParam;
-                                if (!mapTextPos.TryGetValue(position, out position))
+                                if (!mapEditSnapPos.TryGetValue(position, out position))
                                 {
                                     log.InfoFormat("Unable get correct position req: {0}", (int)m.WParam);
                                     position = (int)m.WParam;
@@ -342,7 +356,7 @@ namespace SnapTestDocuments
                         }
                         if (log.IsInfoEnabled)
                         {
-                            log.InfoFormat("Position  C:{0},X:{1},Y:{2}", (int)m.WParam, rectObj.X, rectObj.Y);
+                            log.InfoFormat("Position  C:{0},X:{1},Y:{2} ret:{3}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result);
                         }
                     }
                     break;
@@ -381,7 +395,7 @@ namespace SnapTestDocuments
                     if (textBuff != null)
                     {
                         int position = (int)m.WParam;
-                        if (!mapTextPos.TryGetValue(position, out position))
+                        if (!mapEditSnapPos.TryGetValue(position, out position))
                         {
                             position = (int)m.WParam;
                         }
@@ -521,38 +535,39 @@ namespace SnapTestDocuments
 
         private void ExtSnapControl_ContentChanged(object sender, EventArgs e)
         {
-            var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
-            textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
-            cachedText = Document.GetText(Document.Range, textOpts);
+            //var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
+            //textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
+            cachedText = Text;
             MapTextPositions();
             log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
         }
 
         private void MapTextPositions()
         {
-            var dictPosData = new Dictionary<int, int>();
+            var dictEditPosData = new Dictionary<int, int>();
+            var dictSnapPosData = new Dictionary<int, int>();
             String[] lineparts = cachedText.Split(new string[] { "\r\n" }, StringSplitOptions.None);
             if (lineparts.Length > 0)
             {
-                int sumText = 0;
-                for(int lineIDX = 0; lineIDX < lineparts.Length; lineIDX++)
+                int sumTextEdit = 0;
+                int sumTextSnap = 0;
+                foreach (string lineText in lineparts)
                 {
-                    string lineText = lineparts[lineIDX];
- 
+
                     for (int charIdx = 0; charIdx < lineText.Length; charIdx++)
                     {
-                        if (dictPosData.ContainsKey(charIdx + sumText))
-                        {
-                            log.InfoFormat("Wrong update positions idKey: {0}, valKey {1}, character {2}, ", charIdx + sumText, charIdx + sumText - lineIDX, lineText[charIdx]);
-                        }
-                        else
-                            dictPosData.Add(charIdx + sumText, charIdx + sumText - lineIDX);
+                        dictEditPosData[charIdx + sumTextEdit] = charIdx + sumTextSnap;
+                        dictSnapPosData[charIdx + sumTextSnap] = charIdx + sumTextEdit;
                     }
-                    dictPosData.Add(lineText.Length + sumText, lineText.Length + sumText - lineIDX);
-                    sumText += lineText.Length + 1;
+                    dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length + sumTextSnap;
+                    dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
+                    dictSnapPosData[lineText.Length + sumTextSnap] = lineText.Length + sumTextEdit;
+                    sumTextEdit += lineText.Length + 2;
+                    sumTextSnap += lineText.Length + 1;
                 }
             }
-            mapTextPos = dictPosData;
+            mapEditSnapPos = dictEditPosData;
+            mapSnapEditPos = dictSnapPosData;
         }
     }
 }
