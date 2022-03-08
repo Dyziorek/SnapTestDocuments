@@ -194,8 +194,18 @@ namespace SnapTestDocuments
                     {
                         lastCaretPos = lastselectionPair;
                     }
-                    int firstPos = mapSnapEditPos[lastCaretPos.Item1];
-                    int secondPos = mapSnapEditPos[lastCaretPos.Item2];
+                    int firstPos = lastCaretPos.Item1;
+                    int secondPos = lastCaretPos.Item2;
+                    if (!mapEditSnapPos.TryGetValue(lastCaretPos.Item1, out firstPos))
+                    {
+                        firstPos = lastCaretPos.Item1;
+                    }
+                    //int firstPos = mapSnapEditPos[lastCaretPos.Item1];
+                    if (!mapEditSnapPos.TryGetValue(lastCaretPos.Item2, out secondPos))
+                    {
+                        secondPos = lastCaretPos.Item2;
+                    }
+                    // mapSnapEditPos[lastCaretPos.Item2];
                     if (m.WParam != IntPtr.Zero)
                     {
                         Marshal.WriteInt32(m.WParam, Convert.ToInt32(firstPos)); //ANDATA, Important change
