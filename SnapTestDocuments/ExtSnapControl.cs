@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Security.Permissions;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.Text;
 
 namespace SnapTestDocuments
 {
@@ -117,7 +118,7 @@ namespace SnapTestDocuments
                 docFragment.EndUpdate();
                 caretPos.EndUpdateDocument(docFragment);
                 ExtSnapControl_ContentChanged(this, EventArgs.Empty);// cachedText = Text.Replace("\r", string.Empty);
-                //Document.CaretPosition = docFragment.Range.End;  //ANDATA
+                Document.CaretPosition = caretPos.End;  //ANDATA
                 lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
             }
         }
@@ -130,12 +131,13 @@ namespace SnapTestDocuments
             log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
             
 
-            if (minPos >= Document.Length)
+            if (minPos > cachedText.Length)
             {
-                minPos = Document.Length - 1;
-                maxPos = Document.Length - 1;
+                minPos = Document.Length;
+                maxPos = Document.Length;
+                log.InfoFormat("Changed Request SetSelect from:{0} to: {1}", minPos, maxPos);
             }
-            log.InfoFormat("Request SetSelect from:{0} to: {1}", minPos, maxPos);
+            
             if (minPos == -1)
             {
                 Document.Selection = Document.CreateRange(Document.Range.Start, Document.Range.Length);
@@ -144,10 +146,12 @@ namespace SnapTestDocuments
             {
                 if (!mapEditSnapPos.TryGetValue(minPos, out minPos))
                 {
+                    log.InfoFormat("SetSelect: Unable get mapEditSnapPos correct position req: {0}", Math.Min(wparam, lparam));
                     minPos = Math.Min(wparam, lparam);
                 }
                 if (!mapEditSnapPos.TryGetValue(maxPos, out maxPos))
                 {
+                    log.InfoFormat("SetSelect: Unable get mapEditSnapPos correct position req: {0}", Math.Max(wparam, lparam));
                     maxPos = Math.Max(wparam, lparam);
                 }
                 log.InfoFormat("Mapped setsel orig:{0},{1}, maps{2},{3}", wparam, lparam, minPos, maxPos);
@@ -196,13 +200,15 @@ namespace SnapTestDocuments
                     }
                     int firstPos = lastCaretPos.Item1;
                     int secondPos = lastCaretPos.Item2;
-                    if (!mapEditSnapPos.TryGetValue(lastCaretPos.Item1, out firstPos))
+                    if (!mapSnapEditPos.TryGetValue(lastCaretPos.Item1, out firstPos))
                     {
+                        log.InfoFormat("SetSelect: Unable get mapSnapEditPos correct position req: {0}", lastCaretPos.Item1);
                         firstPos = lastCaretPos.Item1;
                     }
                     //int firstPos = mapSnapEditPos[lastCaretPos.Item1];
-                    if (!mapEditSnapPos.TryGetValue(lastCaretPos.Item2, out secondPos))
+                    if (!mapSnapEditPos.TryGetValue(lastCaretPos.Item2, out secondPos))
                     {
+                        log.InfoFormat("SetSelect: Unable get mapSnapEditPos correct position req: {0}", lastCaretPos.Item2);
                         secondPos = lastCaretPos.Item2;
                     }
                     // mapSnapEditPos[lastCaretPos.Item2];
@@ -348,9 +354,9 @@ namespace SnapTestDocuments
                             if (Document.Range.Length > (int)m.WParam)
                             {
                                 int position = (int)m.WParam;
-                                if (!mapEditSnapPos.TryGetValue(position, out position))
+                                if (!mapSnapEditPos.TryGetValue(position, out position))
                                 {
-                                    log.InfoFormat("Unable get correct position req: {0}", (int)m.WParam);
+                                    log.InfoFormat("EM_POSFROMCHAR: Unable get mapSnapEditPos correct position req: {0}", (int)m.WParam);
                                     position = (int)m.WParam;
                                 }
                                 var docCharPos = Document.CreatePosition(position);
@@ -366,7 +372,7 @@ namespace SnapTestDocuments
                         }
                         if (log.IsInfoEnabled)
                         {
-                            log.InfoFormat("Position  C:{0},X:{1},Y:{2} ret:{3}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result);
+                            log.InfoFormat("Position  C:{0},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result);
                         }
                     }
                     break;
@@ -405,8 +411,9 @@ namespace SnapTestDocuments
                     if (textBuff != null)
                     {
                         int position = (int)m.WParam;
-                        if (!mapEditSnapPos.TryGetValue(position, out position))
+                        if (!mapSnapEditPos.TryGetValue(position, out position))
                         {
+                            log.InfoFormat("EM_LINEFROMCHAR: Unable get mapSnapEditPos correct position req: {0}", (int)m.WParam);
                             position = (int)m.WParam;
                         }
                         String[] lineparts = textBuff.Split('\n');
@@ -489,7 +496,7 @@ namespace SnapTestDocuments
                         log.Debug(string.Format("Replace selected text: '{0}', Undo:{1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
                         break;
                     case 0xb0:
-                        log.Debug(string.Format("Get Selection: from:{0}, to:{1} - ret:{2:X}", Marshal.ReadInt16(m.WParam), Marshal.ReadInt16(m.LParam), (int)m.Result));
+                        //log.Debug(string.Format("Get Selection: from:{0}, to:{1} - ret:{2:X}", Marshal.ReadInt16(m.WParam), Marshal.ReadInt16(m.LParam), (int)m.Result));
                         break;
                     case 0xb1:
                         log.Debug(string.Format("Set Selection : from:{0}, to:{1} - ret:{2}", (int)(m.LParam), (int)(m.WParam), (int)m.Result));
@@ -578,6 +585,17 @@ namespace SnapTestDocuments
             }
             mapEditSnapPos = dictEditPosData;
             mapSnapEditPos = dictSnapPosData;
+
+            //log.InfoFormat("Mapping Edit -> Snap {0}", mapEditSnapPos.AsEnumerable().Aggregate( new StringBuilder(), (x, y) =>
+            //{
+            //    x.Append(y).Append(" ");
+            //    return x;
+            //}).ToString());
+            //log.InfoFormat("Mapping Snap -> Edit {0}", mapSnapEditPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
+            //{
+            //    x.Append(y).Append(" ");
+            //    return x;
+            //}).ToString());
         }
     }
 }
