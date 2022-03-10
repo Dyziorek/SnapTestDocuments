@@ -10,6 +10,7 @@ namespace SnapTestDocuments
     public class DragonAccessManagerCmn : IDragonAccessManager
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("DragonAccessManagerCmn");
+        private DragonDictationHelper dictationHelper = new DragonDictationHelper();
         private DocumentEntityBase currentSelectedInterp = null;
         private ITextFieldInfo currentSectionField = null;
         int currentSectionOffset = 0;
@@ -53,7 +54,6 @@ namespace SnapTestDocuments
 
         public int GetTextLen()
         {
-            log.Debug("GetTextLen:");
             string textResult = GetText();
             if (!string.IsNullOrEmpty(textResult))
             {
@@ -116,7 +116,6 @@ namespace SnapTestDocuments
                     textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
                     cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange, textOpts);
                     log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cacheStringText);
-                    cacheStringText = cacheStringText.Replace("\r", string.Empty);
                 }
                 else
                 {
@@ -126,6 +125,8 @@ namespace SnapTestDocuments
             }
             else
                 cacheStringText = string.Empty;
+
+            dictationHelper.MapTextPositions(cacheStringText);
 
             if (lastPosChar.Item1 != -1)
             {
@@ -149,6 +150,7 @@ namespace SnapTestDocuments
                 {
                     currentSectionOffset = sectionField.ResultRange.Start.ToInt();
                     cacheStringText = SnapCtrl.Document.GetText(sectionField.ResultRange);
+                    dictationHelper.MapTextPositions(cacheStringText);
                     this.currentSectionField = sectionField.GetTextFieldInfo(SnapCtrl.Document); 
                     this.currentSelectedInterp = selectedItem;
                 }
@@ -215,7 +217,6 @@ namespace SnapTestDocuments
                             try
                             {
                                 docFragment.BeginUpdate();
-                                text = CalculateCachedTextChanges(selection, text);
                                 log.InfoFormat("DragAccMgrCmn Replace final Text:'{0}'", text);
                                 docFragment.Replace(selection, text);
                                 //currentSectionField.Field.ToSnap().Update();
@@ -228,13 +229,13 @@ namespace SnapTestDocuments
 
                                 if (selection.End <= currentSectionField.Field.ToSnap().ResultRange.End)
                                 {
-                                    this.SnapCtrl.Document.CaretPosition = selection.End;
-                                    lastselectionPair = new Tuple<int, int>(selection.End.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
+                                    //this.SnapCtrl.Document.CaretPosition = selection.End;
+                                    //lastselectionPair = new Tuple<int, int>(selection.End.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
                                 }
                                 else
                                 {
-                                    this.SnapCtrl.Document.CaretPosition = currentSectionField.Field.ToSnap().ResultRange.End;
-                                    lastselectionPair = new Tuple<int, int>(currentSectionField.Field.ToSnap().ResultRange.End.ToInt() - currentSectionOffset, currentSectionField.Field.ToSnap().ResultRange.End.ToInt() - currentSectionOffset);
+                                    //this.SnapCtrl.Document.CaretPosition = currentSectionField.Field.ToSnap().ResultRange.End;
+                                    //lastselectionPair = new Tuple<int, int>(currentSectionField.Field.ToSnap().ResultRange.End.ToInt() - currentSectionOffset, currentSectionField.Field.ToSnap().ResultRange.End.ToInt() - currentSectionOffset);
                                 }
 
                                 cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
@@ -268,6 +269,8 @@ namespace SnapTestDocuments
 
                     var selection = this.SnapCtrl.Document.Selection;
                     this.lastselectionPair = new Tuple<int, int>(selection.Start.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
+                    start = dictationHelper.EditToSnap(start);
+                    end = dictationHelper.EditToSnap(end);
                     int minPos = Math.Min(currentSectionOffset + start, currentSectionOffset + end);
                     int maxPos = Math.Max(currentSectionOffset + start, currentSectionOffset + end);
                     if ((maxPos - minPos) > currentSectionLength)
@@ -275,7 +278,7 @@ namespace SnapTestDocuments
                         minPos = currentSectionOffset;
                         maxPos = currentSectionOffset + currentSectionLength - 1;
                     }
-                    if ((maxPos - minPos) == 0)
+                    if (maxPos == minPos)
                     {
                         this.SnapCtrl.Document.CaretPosition = this.SnapCtrl.Document.CreatePosition(minPos + 1);
                     }
@@ -343,35 +346,6 @@ namespace SnapTestDocuments
                 }
             }
             return -1;
-        }
-
-        private string CalculateCachedTextChanges(DocumentRange caretPos, string messageText)
-        {
-            string oldCachedText = cacheStringText;
-
-            int changeTextPos = caretPos.Start.ToInt() - currentSectionOffset;
-
-            if (changeTextPos > 0 && changeTextPos < cacheStringText.Length)
-            {
-                string begin = cacheStringText.Substring(0, changeTextPos);
-                string end = cacheStringText.Substring(changeTextPos + caretPos.Length);
-
-                log.InfoFormat("Cached Text '{0}', begin with '{1}', ends with '{2}'", cacheStringText, begin, end);
-
-                log.InfoFormat("Update cached text on replacing: old cached '{0}', text to replace '{1}'  at {2} , result '{3}'", oldCachedText, messageText, caretPos.Start.ToInt(), begin + messageText + end);
-                if (begin.Length > 0 && begin.Last() == ' ' && messageText.Length > 0 && messageText.First() == ' ')
-                {
-                    log.InfoFormat("Correction '{0}'", messageText.Substring(1));
-                    return messageText.Substring(1);
-                }
-                log.InfoFormat("New text '{0}'", messageText.Length > 0 ? messageText.Substring(1) : messageText);
-            }
-            else
-            {
-                log.InfoFormat("Unable to correct text '{0}' based on cache", messageText);
-                log.InfoFormat("Cache text '{0}', text size:{1}, postion to verify:{2}", cacheStringText, cacheStringText.Length, changeTextPos);
-            }
-            return messageText;
         }
 
         public void TurnOn()

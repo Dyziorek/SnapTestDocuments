@@ -17,8 +17,7 @@ namespace SnapTestDocuments
 
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
         private ISnapReportContext _currentContext;
-        private Dictionary<int, int> mapEditSnapPos = new Dictionary<int, int>();
-        private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
+        DragonDictationHelper dictationHelper = new DragonDictationHelper();
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);  // start, end
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);  // start, end
         private string cachedText;
@@ -93,7 +92,11 @@ namespace SnapTestDocuments
             {
                 caretPos = Document.CreateRange(lastselectionPair.Item1, Math.Abs(lastselectionPair.Item2 - lastselectionPair.Item1));
             }
-            string textToReplace = cachedText.Substring(caretPos.Start.ToInt(), caretPos.End.ToInt() - caretPos.Start.ToInt());
+            string textToReplace = cachedText;
+            if (caretPos.Start.ToInt() + caretPos.End.ToInt() - caretPos.Start.ToInt() <= cachedText.Length)
+            {
+                textToReplace = cachedText.Substring(caretPos.Start.ToInt(), caretPos.End.ToInt() - caretPos.Start.ToInt());
+            }
             log.InfoFormat("Replace selected text: '{0}', with  '{1}' on text '{2}'", textToReplace, messageText, cachedText);
             if (!String.IsNullOrEmpty(textToReplace) && !String.IsNullOrEmpty(messageText))
             {
@@ -110,7 +113,6 @@ namespace SnapTestDocuments
             try
             {
                 docFragment.BeginUpdate();
-                messageText = CalculateCachedTextChanges(caretPos, messageText);
                 docFragment.Replace(caretPos, messageText);
             }
             finally
@@ -144,24 +146,16 @@ namespace SnapTestDocuments
             }
             else
             {
-                if (!mapEditSnapPos.TryGetValue(minPos, out minPos))
-                {
-                    log.InfoFormat("SetSelect: Unable get mapEditSnapPos correct position req: {0}", Math.Min(wparam, lparam));
-                    minPos = Math.Min(wparam, lparam);
-                }
-                if (!mapEditSnapPos.TryGetValue(maxPos, out maxPos))
-                {
-                    log.InfoFormat("SetSelect: Unable get mapEditSnapPos correct position req: {0}", Math.Max(wparam, lparam));
-                    maxPos = Math.Max(wparam, lparam);
-                }
+                minPos = dictationHelper.EditToSnap(minPos);
+                maxPos = dictationHelper.EditToSnap(maxPos);
                 log.InfoFormat("Mapped setsel orig:{0},{1}, maps{2},{3}", wparam, lparam, minPos, maxPos);
-                if (Math.Abs(maxPos - minPos) == 0)
+                if (maxPos == minPos)
                 {
                     Document.CaretPosition = Document.CreatePosition(minPos);
                 }
                 else
                 {
-                    Document.Selection = Document.CreateRange(Document.CreatePosition(Math.Min(maxPos, minPos)), Math.Abs(maxPos - minPos));
+                    Document.Selection = Document.CreateRange(minPos, maxPos - minPos);
                 }
             }
             return new Tuple<int, int>(minPos, maxPos);
@@ -198,20 +192,9 @@ namespace SnapTestDocuments
                     {
                         lastCaretPos = lastselectionPair;
                     }
-                    int firstPos = lastCaretPos.Item1;
-                    int secondPos = lastCaretPos.Item2;
-                    if (!mapSnapEditPos.TryGetValue(lastCaretPos.Item1, out firstPos))
-                    {
-                        log.InfoFormat("SetSelect: Unable get mapSnapEditPos correct position req: {0}", lastCaretPos.Item1);
-                        firstPos = lastCaretPos.Item1;
-                    }
-                    //int firstPos = mapSnapEditPos[lastCaretPos.Item1];
-                    if (!mapSnapEditPos.TryGetValue(lastCaretPos.Item2, out secondPos))
-                    {
-                        log.InfoFormat("SetSelect: Unable get mapSnapEditPos correct position req: {0}", lastCaretPos.Item2);
-                        secondPos = lastCaretPos.Item2;
-                    }
-                    // mapSnapEditPos[lastCaretPos.Item2];
+                    int firstPos = dictationHelper.SnapToEdit(lastCaretPos.Item1);
+                    int secondPos = dictationHelper.SnapToEdit(lastCaretPos.Item2);
+                    
                     if (m.WParam != IntPtr.Zero)
                     {
                         Marshal.WriteInt32(m.WParam, Convert.ToInt32(firstPos)); //ANDATA, Important change
@@ -329,7 +312,7 @@ namespace SnapTestDocuments
                         if (cachedText == null)
                         {
                             cachedText = Text;
-                            MapTextPositions();
+                            dictationHelper.MapTextPositions(cachedText);
                         }
                         m.Result = (IntPtr)cachedText.Length;
                     }
@@ -344,6 +327,7 @@ namespace SnapTestDocuments
                     if ((int)m.WParam >= 0)
                     {
                         System.Drawing.Rectangle rectObj = new System.Drawing.Rectangle();
+                        
                         if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                         {
                             rectObj = _currentContext.GetManager<IDragonAccessManager>().PosFromChar((int)m.WParam);
@@ -353,12 +337,7 @@ namespace SnapTestDocuments
                         {
                             if (Document.Range.Length > (int)m.WParam)
                             {
-                                int position = (int)m.WParam;
-                                if (!mapSnapEditPos.TryGetValue(position, out position))
-                                {
-                                    log.InfoFormat("EM_POSFROMCHAR: Unable get mapSnapEditPos correct position req: {0}", (int)m.WParam);
-                                    position = (int)m.WParam;
-                                }
+                                int position = dictationHelper.SnapToEdit((int)m.WParam);
                                 var docCharPos = Document.CreatePosition(position);
                                 rectObj = GetBoundsFromPosition(docCharPos);
                                 rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
@@ -410,12 +389,7 @@ namespace SnapTestDocuments
                     }
                     if (textBuff != null)
                     {
-                        int position = (int)m.WParam;
-                        if (!mapSnapEditPos.TryGetValue(position, out position))
-                        {
-                            log.InfoFormat("EM_LINEFROMCHAR: Unable get mapSnapEditPos correct position req: {0}", (int)m.WParam);
-                            position = (int)m.WParam;
-                        }
+                        int position = dictationHelper.SnapToEdit((int)m.WParam);
                         String[] lineparts = textBuff.Split('\n');
                         if (textBuff.Length < position)
                         {
@@ -508,27 +482,6 @@ namespace SnapTestDocuments
             }
         }
 
-        private string CalculateCachedTextChanges(DocumentRange caretPos, string messageText)
-        {
-            string oldCachedText = cachedText;
-
-            string begin = cachedText.Substring(0, caretPos.Start.ToInt());
-            string end = cachedText.Substring(caretPos.Start.ToInt() + caretPos.Length);
-
-            log.InfoFormat("Cached Text '{0}', begin with {1}, ends with {2}", cachedText, begin, end);
-
-            log.InfoFormat("Update cached text on replacing: old cached '{0}', text to replace '{1}'  at {2} , result '{3}'", oldCachedText, messageText, caretPos.Start.ToInt(), begin + messageText + end);
-            if (begin.Length > 0 && begin.Last() == ' ' && messageText.Length > 0 && messageText.First() == ' ')
-            {
-                log.InfoFormat("Correction '{0}'", messageText.Substring(1));
-                return messageText.Substring(1);
-            }
-            
-            log.InfoFormat("New text '{0}'", !String.IsNullOrEmpty(messageText) ? messageText.Substring(1) : "Empty String");
-            
-            return messageText;
-        }
-
         private void ExtSnapControl_SelectionChanged(object sender, EventArgs e)
         {            
             log.Info("ExtSnapControl_SelectionChanged:");
@@ -555,47 +508,10 @@ namespace SnapTestDocuments
             //var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
             //textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
             cachedText = Text;
-            MapTextPositions();
+            dictationHelper.MapTextPositions(cachedText);
             log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
         }
 
-        private void MapTextPositions()
-        {
-            var dictEditPosData = new Dictionary<int, int>();
-            var dictSnapPosData = new Dictionary<int, int>();
-            String[] lineparts = cachedText.Split(new string[] { "\r\n" }, StringSplitOptions.None);
-            if (lineparts.Length > 0)
-            {
-                int sumTextEdit = 0;
-                int sumTextSnap = 0;
-                foreach (string lineText in lineparts)
-                {
-
-                    for (int charIdx = 0; charIdx < lineText.Length; charIdx++)
-                    {
-                        dictEditPosData[charIdx + sumTextEdit] = charIdx + sumTextSnap;
-                        dictSnapPosData[charIdx + sumTextSnap] = charIdx + sumTextEdit;
-                    }
-                    dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length + sumTextSnap;
-                    dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
-                    dictSnapPosData[lineText.Length + sumTextSnap] = lineText.Length + sumTextEdit;
-                    sumTextEdit += lineText.Length + 2;
-                    sumTextSnap += lineText.Length + 1;
-                }
-            }
-            mapEditSnapPos = dictEditPosData;
-            mapSnapEditPos = dictSnapPosData;
-
-            //log.InfoFormat("Mapping Edit -> Snap {0}", mapEditSnapPos.AsEnumerable().Aggregate( new StringBuilder(), (x, y) =>
-            //{
-            //    x.Append(y).Append(" ");
-            //    return x;
-            //}).ToString());
-            //log.InfoFormat("Mapping Snap -> Edit {0}", mapSnapEditPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
-            //{
-            //    x.Append(y).Append(" ");
-            //    return x;
-            //}).ToString());
-        }
+        
     }
 }

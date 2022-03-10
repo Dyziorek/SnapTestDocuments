@@ -16,7 +16,6 @@ namespace SnapTestDocuments
         private MemoryStream memoryStream;
         private SnapContextImpl context;
         private DocumentEntityBase selectedItem;
-        private SnapControl[] myControls;
         string ActiveSnapControl;
 
         //private Nuance.SoD.TextControl.TextControlManager manager;

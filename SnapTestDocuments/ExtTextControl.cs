@@ -14,6 +14,13 @@ namespace SnapTestDocuments
             public int Top;
             public int Right;
             public int Bottom;
+            public RECT(int l, int r, int t, int b)
+            {
+                Left = l;
+                Right = r;
+                Top = t;
+                Bottom = b;
+            }
         }
 
         protected override void WndProc(ref Message m)

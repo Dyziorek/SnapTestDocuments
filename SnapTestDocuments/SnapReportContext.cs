@@ -252,6 +252,7 @@ namespace SnapTestDocuments
         bool begin;
         public DocPos(DocumentRange fieldRange, bool begin)
         {
+            this.begin = begin;
             workItem = fieldRange;
         }
 
@@ -428,7 +429,7 @@ namespace SnapTestDocuments
             subDocument.CancelUpdateRangePermissions(rangesCol);
 
 
-            return true;
+            return isEditable;
         }
     }
 }
