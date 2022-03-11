@@ -112,10 +112,21 @@ namespace SnapTestDocuments
             {
                 if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField.Field))
                 {
-                    var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
-                    textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
-                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange, textOpts);
-                    log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cacheStringText);
+                    bool lastParMark = false;
+                    cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
+                    var paragraphs = this.SnapCtrl.Document.Paragraphs.Get(currentSectionField.Field.ToSnap().ResultRange);
+                    foreach(var parItem in paragraphs)
+                    {
+                        if (parItem.Range.End.ToInt() == currentSectionField.Field.ToSnap().ResultRange.End.ToInt())
+                        {
+                            lastParMark = true;
+                        }
+                    }
+                    if (lastParMark)
+                    {
+                        cacheStringText += "\r\n";
+                    }
+                    log.InfoFormat("DragAccMgrCmn: SnapControl_ContentChanged - retrieved text with option: '{0}'", cacheStringText);
                 }
                 else
                 {
@@ -127,8 +138,7 @@ namespace SnapTestDocuments
                 cacheStringText = string.Empty;
 
             dictationHelper.MapTextPositions(cacheStringText);
-
-            log.InfoFormat("SnapControl_ContentChanged - updated text: '{0}'", cacheStringText);
+            log.InfoFormat("DragAccMgrCmn: SnapControl_ContentChanged - updated text: '{0}'", cacheStringText);
         }
 
         public bool HasSections()
@@ -235,6 +245,7 @@ namespace SnapTestDocuments
                                 }
 
                                 cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
+                                dictationHelper.MapTextPositions(cacheStringText);
                                 log.InfoFormat("DragAccMgrCmn Whole Section Text after replace:'{0}'", cacheStringText);
                             }
 
@@ -307,7 +318,6 @@ namespace SnapTestDocuments
                     int currentSectionLength = currentSectionField.ResultRange.Length;
 
                     int minPos = Math.Min(currentSectionOffset + charPos, currentSectionOffset + currentSectionLength);
-                    minPos = dictationHelper.SnapToEdit(minPos);
                     return DevExpress.Office.Utils.Units.DocumentsToPixels(snapCtrlCtx.SnapControl.GetBoundsFromPosition(snapCtrlCtx.SnapDocument.CreatePosition(minPos)), snapCtrlCtx.SnapControl.DpiX, snapCtrlCtx.SnapControl.DpiY); 
                 }
                 else

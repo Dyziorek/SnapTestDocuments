@@ -507,9 +507,13 @@ namespace SnapTestDocuments
         {
             //var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
             //textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
-            cachedText = Text;
-            dictationHelper.MapTextPositions(cachedText);
-            log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
+            if (_currentContext == null)
+            {
+                cachedText = Text;
+                dictationHelper.MapTextPositions(cachedText);
+
+                log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
+            }
         }
 
         
