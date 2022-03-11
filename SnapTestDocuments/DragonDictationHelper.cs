@@ -80,5 +80,29 @@ namespace SnapTestDocuments
             }
             return editPos;
         }
+
+        public static int getLineFromText(string textCharacters, int position)
+        {
+            String[] lineparts = textCharacters.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+            if (textCharacters.Length < position)
+            {
+               return lineparts.Length - 1;
+            }
+            else if (lineparts.Length > 0)
+            {
+                int stringTotal = 0;
+                int lineCounter = lineparts.Count(sum =>
+                {
+                    stringTotal += sum.Length + 1;
+                    if (stringTotal < position)
+                    {
+                        return true;
+                    }
+                    return false;
+                });
+                return lineCounter - 1;
+            }
+            return 0;
+        }
     }
 }

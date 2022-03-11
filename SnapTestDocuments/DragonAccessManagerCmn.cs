@@ -16,7 +16,7 @@ namespace SnapTestDocuments
         int currentSectionOffset = 0;
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0); //start, end
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);
-        private string cacheStringText = string.Empty;
+        private string cacheStringText = null;
 
         protected ISnapCtrlContext snapCtrlCtx;
         protected DevExpress.Snap.SnapControl SnapCtrl { get { return snapCtrlCtx.SnapControl; } }
@@ -25,7 +25,7 @@ namespace SnapTestDocuments
         {
             this.snapCtrlCtx = snapCtrlCtx;
         }
-        private Tuple<int, Rectangle> lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
+        //private Tuple<int, Rectangle> lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
 
         public void Clear()
         {
@@ -39,7 +39,7 @@ namespace SnapTestDocuments
             if (this.currentSelectedInterp != null)
             {
                 log.InfoFormat("DragAccMgrCmn  GetSel returns p:{0}, l:{1}", lastselectionPair.Item1, lastselectionPair.Item2);
-                return lastselectionPair;
+                return new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2));
             }
             log.InfoFormat("DragAccMgrCmn GetSel returns zero p:{0}, l:{1}", 0, 0);
             return new Tuple<int, int>(0, 0);
@@ -128,10 +128,6 @@ namespace SnapTestDocuments
 
             dictationHelper.MapTextPositions(cacheStringText);
 
-            if (lastPosChar.Item1 != -1)
-            {
-                lastPosChar = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
-            }
             log.InfoFormat("SnapControl_ContentChanged - updated text: '{0}'", cacheStringText);
         }
 
@@ -311,13 +307,8 @@ namespace SnapTestDocuments
                     int currentSectionLength = currentSectionField.ResultRange.Length;
 
                     int minPos = Math.Min(currentSectionOffset + charPos, currentSectionOffset + currentSectionLength);
-
-                    if (minPos == lastPosChar.Item1)
-                    {
-                        return lastPosChar.Item2;
-                    }
-                    lastPosChar = new Tuple<int, Rectangle>(minPos, snapCtrlCtx.SnapControl.GetBoundsFromPosition(snapCtrlCtx.SnapDocument.CreatePosition(minPos)));
-                    return lastPosChar.Item2;
+                    minPos = dictationHelper.SnapToEdit(minPos);
+                    return DevExpress.Office.Utils.Units.DocumentsToPixels(snapCtrlCtx.SnapControl.GetBoundsFromPosition(snapCtrlCtx.SnapDocument.CreatePosition(minPos)), snapCtrlCtx.SnapControl.DpiX, snapCtrlCtx.SnapControl.DpiY); 
                 }
                 else
                 {

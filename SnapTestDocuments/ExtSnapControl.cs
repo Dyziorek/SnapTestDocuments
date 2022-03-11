@@ -190,18 +190,16 @@ namespace SnapTestDocuments
                     }
                     else
                     {
-                        lastCaretPos = lastselectionPair;
+                        lastCaretPos = new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2));
                     }
-                    int firstPos = dictationHelper.SnapToEdit(lastCaretPos.Item1);
-                    int secondPos = dictationHelper.SnapToEdit(lastCaretPos.Item2);
                     
                     if (m.WParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt32(m.WParam, Convert.ToInt32(firstPos)); //ANDATA, Important change
+                        Marshal.WriteInt32(m.WParam, Convert.ToInt32(lastCaretPos.Item1)); //ANDATA, Important change
                     }
                     if (m.LParam != IntPtr.Zero)
                     {
-                        Marshal.WriteInt32(m.LParam, Convert.ToInt32(secondPos)); //ANDATA, Important change
+                        Marshal.WriteInt32(m.LParam, Convert.ToInt32(lastCaretPos.Item2)); //ANDATA, Important change
                     }
                     if (lastCaretPos.Item1 > 65535)
                     {
@@ -211,7 +209,7 @@ namespace SnapTestDocuments
                     {
                         lastCaretPos = new Tuple<int, int>(lastCaretPos.Item1, 65535 - lastCaretPos.Item1);
                     }
-                    Int32 retVal = Convert.ToInt16(firstPos) + (Convert.ToInt16(secondPos) << 16);
+                    Int32 retVal = Convert.ToInt16(lastCaretPos.Item1) + (Convert.ToInt16(lastCaretPos.Item2) << 16);
                     m.Result = (IntPtr)retVal;
                     log.InfoFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt32(m.WParam), Marshal.ReadInt32(m.LParam), (int)m.Result);
                     break;
@@ -337,8 +335,8 @@ namespace SnapTestDocuments
                         {
                             if (Document.Range.Length > (int)m.WParam)
                             {
-                                int position = dictationHelper.SnapToEdit((int)m.WParam);
-                                var docCharPos = Document.CreatePosition(position);
+                                int charPosition = dictationHelper.SnapToEdit((int)m.WParam);
+                                var docCharPos = Document.CreatePosition(charPosition);
                                 rectObj = GetBoundsFromPosition(docCharPos);
                                 rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
                                 
@@ -379,6 +377,7 @@ namespace SnapTestDocuments
                     break;
                 case 0xc9:  // EM_LINEFROMCHAR
                     m.Result = IntPtr.Zero;
+                    int position = (int)m.WParam;
                     if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
                         textBuff = _currentContext.GetManager<IDragonAccessManager>().GetText();
@@ -386,10 +385,11 @@ namespace SnapTestDocuments
                     else
                     {
                         textBuff = cachedText;
+                        dictationHelper.SnapToEdit((int)m.WParam);
                     }
                     if (textBuff != null)
                     {
-                        int position = dictationHelper.SnapToEdit((int)m.WParam);
+                        m.Result = (IntPtr)DragonDictationHelper.getLineFromText(textBuff, position);
                         String[] lineparts = textBuff.Split('\n');
                         if (textBuff.Length < position)
                         {
