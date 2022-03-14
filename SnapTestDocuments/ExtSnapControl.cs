@@ -81,6 +81,19 @@ namespace SnapTestDocuments
             set
             {
                 _currentContext = value;
+
+                if (_currentContext == null)
+                {
+                    this.ContentChanged -= ExtSnapControl_ContentChanged;
+                    this.ContentChanged += ExtSnapControl_ContentChanged;
+                    this.SelectionChanged -= ExtSnapControl_SelectionChanged;
+                    this.SelectionChanged += ExtSnapControl_SelectionChanged;
+                }
+                else
+                {
+                    this.ContentChanged -= ExtSnapControl_ContentChanged;
+                    this.SelectionChanged -= ExtSnapControl_SelectionChanged;
+                }
             }
         }
 
@@ -122,6 +135,7 @@ namespace SnapTestDocuments
                 ExtSnapControl_ContentChanged(this, EventArgs.Empty);// cachedText = Text.Replace("\r", string.Empty);
                 Document.CaretPosition = caretPos.End;  //ANDATA
                 lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
+                log.InfoFormat("Replaced text: last selection is:{0}", lastselectionPair);
             }
         }
 
@@ -224,7 +238,7 @@ namespace SnapTestDocuments
                         requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam); //ANDATA
                     }
                     m.Result = (IntPtr)1;
-                    log.InfoFormat("Updated Selection:  old: {0} new: {1} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
+                    log.InfoFormat("Updated Selection:  old: {1} new: {0} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
                     break;
                 case 135: //WM_GETDLGCODE
                     m.Result = (IntPtr)0x89;
@@ -329,13 +343,20 @@ namespace SnapTestDocuments
                         if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                         {
                             rectObj = _currentContext.GetManager<IDragonAccessManager>().PosFromChar((int)m.WParam);
-                            m.Result = (IntPtr)(Convert.ToInt16(rectObj.X) + (Convert.ToInt16(rectObj.Y) << 16));
+                            if (rectObj.IsEmpty)
+                            {
+                                m.Result = (IntPtr)(-1);
+                            }
+                            else
+                            {
+                                m.Result = (IntPtr)(Convert.ToInt16(rectObj.X) + (Convert.ToInt16(rectObj.Y) << 16));
+                            }
                         }
                         else
                         {
-                            if (Document.Range.Length > (int)m.WParam)
+                            int charPosition = dictationHelper.EditToSnap((int)m.WParam);
+                            if (Document.Range.Length > charPosition)
                             {
-                                int charPosition = dictationHelper.SnapToEdit((int)m.WParam);
                                 var docCharPos = Document.CreatePosition(charPosition);
                                 rectObj = GetBoundsFromPosition(docCharPos);
                                 rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
@@ -346,10 +367,11 @@ namespace SnapTestDocuments
                             {
                                 m.Result = (IntPtr)(-1);
                             }
-                        }
-                        if (log.IsInfoEnabled)
-                        {
-                            log.InfoFormat("Position  C:{0},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result);
+                            if (log.IsInfoEnabled)
+                            {
+                                log.InfoFormat("Position  C:{0},mapped:{4},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result, charPosition);
+                            }
+
                         }
                     }
                     break;
@@ -385,7 +407,6 @@ namespace SnapTestDocuments
                     else
                     {
                         textBuff = cachedText;
-                        dictationHelper.SnapToEdit((int)m.WParam);
                     }
                     if (textBuff != null)
                     {

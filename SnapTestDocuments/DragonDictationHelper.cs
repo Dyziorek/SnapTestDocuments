@@ -57,25 +57,51 @@ namespace SnapTestDocuments
             mapEditSnapPos = dictEditPosData;
             mapSnapEditPos = dictSnapPosData;
 
+            if (log.IsDebugEnabled)
+            {
+                int diffValue = 0;
+                log.DebugFormat("Mapping Edit -> Snap {0}", mapEditSnapPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
+                {
+                    if (y.Key - y.Value > diffValue)
+                    {
+                        x.Append("Diff:").Append(++diffValue).Append(" at:").Append(y).Append(" ");
+                    }
+                    return x;
+                }).ToString());
+                diffValue = 0;
+                log.DebugFormat("Mapping Snap -> Edit {0}", mapSnapEditPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
+                {
+                    if (y.Value - y.Key > diffValue)
+                    {
+                        x.Append("Diff:").Append(++diffValue).Append(" at:").Append(y).Append(" ");
+                    }
+                    return x;
+                }).ToString());
+            }
         }
 
-        public int EditToSnap(int editPos)
+        public int EditToSnap(int editPos, [System.Runtime.CompilerServices.CallerMemberName] string CallMethod = null, [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
         {
             int snapPos;
             if (!mapEditSnapPos.TryGetValue(editPos, out snapPos))
             {
-                log.InfoFormat("EditToSnap: Unable get Snap postion from Edit : {0}", editPos);
+                log.InfoFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
                 snapPos = editPos;
             }
             return snapPos;
         }
 
-        public int SnapToEdit(int snapPos)
+        public int SnapToEdit(int snapPos,[System.Runtime.CompilerServices.CallerMemberName] string CallMethod = null,  [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
         {
             int editPos;
             if (!mapSnapEditPos.TryGetValue(snapPos, out editPos))
             {
-                log.InfoFormat("SnapToEdit: Unable get Edit postion from Snap: {0}", snapPos);
+                log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                log.DebugFormat("Mapping Snap -> Edit {0}", mapSnapEditPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
+                {
+                    x.Append(y).Append(" ");
+                    return x;
+                }).ToString());
                 editPos = snapPos;
             }
             return editPos;
