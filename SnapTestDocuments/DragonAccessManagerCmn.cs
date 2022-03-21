@@ -16,6 +16,7 @@ namespace SnapTestDocuments
         int currentSectionOffset = 0;
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0); //start, end
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);
+        private Tuple<int, Rectangle> lastCharRect = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
         private string cacheStringText = null;
 
         protected ISnapCtrlContext snapCtrlCtx;
@@ -159,6 +160,7 @@ namespace SnapTestDocuments
                     currentSectionOffset = sectionField.ResultRange.Start.ToInt();
                     this.currentSectionField = sectionField.GetTextFieldInfo(SnapCtrl.Document); 
                     this.currentSelectedInterp = selectedItem;
+                    lastCharRect = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
                     DragonAccessManagerCmn_ContentChanged(this, EventArgs.Empty);
                 }
                 else
@@ -303,7 +305,13 @@ namespace SnapTestDocuments
                     int snapPos = dictationHelper.EditToSnap(charPos);
                     if (snapPos <= currentSectionLength)
                     {
+                        if (lastCharRect.Item1 == snapPos + currentSectionOffset)
+                        {
+                            return lastCharRect.Item2;
+                        }
+
                         var rectPos = DevExpress.Office.Utils.Units.DocumentsToPixels(snapCtrlCtx.SnapControl.GetBoundsFromPosition(snapCtrlCtx.SnapDocument.CreatePosition(currentSectionOffset + snapPos)), snapCtrlCtx.SnapControl.DpiX, snapCtrlCtx.SnapControl.DpiY);
+                        lastCharRect = new Tuple<int, Rectangle>(snapPos + currentSectionOffset, rectPos);
                         log.InfoFormat("Position  C:{0},Maps:{3},X:{1},Y:{2}", charPos, rectPos.X, rectPos.Y, snapPos);
                         return rectPos;
                     }

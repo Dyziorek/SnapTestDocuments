@@ -77,10 +77,10 @@ namespace SnapTestDocuments
             // textBox1
             // 
             this.textBox1.Font = new System.Drawing.Font("Arial", 10F);
-            this.textBox1.Location = new System.Drawing.Point(6, 26);
+            this.textBox1.Location = new System.Drawing.Point(6, 25);
             this.textBox1.Multiline = true;
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(828, 79);
+            this.textBox1.Size = new System.Drawing.Size(828, 165);
             this.textBox1.TabIndex = 1;
             // 
             // label1
@@ -117,7 +117,7 @@ namespace SnapTestDocuments
             this.snapControl2.Name = "snapControl2";
             this.snapControl2.Options.DocumentCapabilities.TrackChanges = DevExpress.XtraRichEdit.DocumentCapability.Disabled;
             this.snapControl2.Options.SnapMailMergeVisualOptions.DataSourceName = null;
-            this.snapControl2.Size = new System.Drawing.Size(909, 578);
+            this.snapControl2.Size = new System.Drawing.Size(909, 506);
             this.snapControl2.TabIndex = 0;
             // 
             // btnSaveDoc
@@ -135,7 +135,7 @@ namespace SnapTestDocuments
             this.splitContainer1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.splitContainer1.Location = new System.Drawing.Point(6, 124);
+            this.splitContainer1.Location = new System.Drawing.Point(6, 196);
             this.splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
@@ -145,7 +145,7 @@ namespace SnapTestDocuments
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.textBox2);
-            this.splitContainer1.Size = new System.Drawing.Size(1206, 578);
+            this.splitContainer1.Size = new System.Drawing.Size(1206, 506);
             this.splitContainer1.SplitterDistance = 909;
             this.splitContainer1.TabIndex = 5;
             // 
@@ -156,7 +156,7 @@ namespace SnapTestDocuments
             this.textBox2.Multiline = true;
             this.textBox2.Name = "textBox2";
             this.textBox2.ScrollBars = System.Windows.Forms.ScrollBars.Vertical;
-            this.textBox2.Size = new System.Drawing.Size(293, 578);
+            this.textBox2.Size = new System.Drawing.Size(293, 506);
             this.textBox2.TabIndex = 0;
             // 
             // snapDocumentManager1
@@ -255,7 +255,7 @@ namespace SnapTestDocuments
 
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
         private System.Windows.Forms.Button bntOpen;
-        private ExtTextControl textBox1;
+        private SnapTestDocuments.ExtTextControl textBox1;
         private System.Windows.Forms.Label label1;
         private DevExpress.Snap.Extensions.SnapDockManager snapDockManager1;
         private System.Windows.Forms.Button btnSaveDoc;

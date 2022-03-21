@@ -61,6 +61,24 @@ namespace SnapTestDocuments
                     else
                         log.Info(string.Format("PosFromChar CharPos :{0}  return: values({1:X}) x.y:{2},{3} ", (int)m.WParam & 0x0000FFFF, (int)m.Result, (int)m.Result & 0x0000FFFF, ((int)m.Result & 0xFFFF0000) >> 16));
                     break;
+                case 0xc9: // EM_LINEFROMCHAR
+                    if (log.IsInfoEnabled)
+                    {
+                        log.InfoFormat("Line Pos from Point  C:{0}, X:{1} ,Line:{2}", (int)m.WParam, (int)m.LParam,  (int)m.Result);
+                    }
+                    break;
+                case 0xc1:  // EM_LINELENGTH
+                    if (log.IsInfoEnabled)
+                    {
+                        log.InfoFormat("Line Len from Point  C:{0}, X:{1} ,Line:{2}", (int)m.WParam, (int)m.LParam, (int)m.Result);
+                    }
+                    break;
+                case 0xb8: // EM_GETMODIFY
+                    log.InfoFormat("Message:  GetModify, Lparam: {1}, WParam {2}, ret {3}", m.LParam, m.WParam, m.Result);
+                    break;
+                case 0x31:
+                    log.InfoFormat("Message:  GetFont, Lparam: {1}, WParam {2}, ret {3}", m.LParam, m.WParam, m.Result);
+                    break;
                 default:
                     log.InfoFormat("Message:  ID: 0x{0:x}, Lparam: {1}, WParam {2}, ret {3}", m.Msg, m.LParam, m.WParam, m.Result);
                     break;

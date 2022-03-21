@@ -229,16 +229,27 @@ namespace SnapTestDocuments
                     break;
                 case 177: //EM_SETSEL - sets Selection marker by positions provided in m.Wparam i m.LParam - store previous selection, 
                           // because Dragon sets cursor after previous selected range just before replacing text
-                    if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                     {
-                        requestSelectPair = _currentContext.GetManager<IDragonAccessManager>().SetSel((int)m.WParam, (int)m.LParam);
+                        if ((long)m.LParam > int.MaxValue || (long)m.LParam < int.MinValue)
+                        {
+                            m.LParam = IntPtr.Zero;
+                        }
+                        if ((long)m.WParam > int.MaxValue || (long)m.WParam < int.MinValue)
+                        {
+                            m.WParam = IntPtr.Zero;
+                        }
+
+                        if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
+                        {
+                            requestSelectPair = _currentContext.GetManager<IDragonAccessManager>().SetSel((int)m.WParam, (int)m.LParam);
+                        }
+                        else
+                        {
+                            requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam); //ANDATA
+                        }
+                        m.Result = (IntPtr)1;
+                        log.InfoFormat("Updated Selection:  old: {1} new: {0} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
                     }
-                    else
-                    {
-                        requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam); //ANDATA
-                    }
-                    m.Result = (IntPtr)1;
-                    log.InfoFormat("Updated Selection:  old: {1} new: {0} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
                     break;
                 case 135: //WM_GETDLGCODE
                     m.Result = (IntPtr)0x89;
@@ -411,25 +422,31 @@ namespace SnapTestDocuments
                     if (textBuff != null)
                     {
                         m.Result = (IntPtr)DragonDictationHelper.getLineFromText(textBuff, position);
-                        String[] lineparts = textBuff.Split('\n');
-                        if (textBuff.Length < position)
+                        if (log.IsInfoEnabled)
                         {
-                            m.Result = (IntPtr)(lineparts.Length - 1);
+                            log.InfoFormat("Line Pos from Point  C:{0},Line:{1}", position, (int)m.Result);
                         }
-                        else if (lineparts.Length > 0)
+                    }
+                    break;
+                case 0xbb: //EM_LINEINDEX
+                    {
+                        m.Result = (IntPtr)(-1);
+                        int lineIndex = (int)m.WParam;
+                        if (_currentContext != null && _currentContext.GetManager<IDragonAccessManager>() != null)
                         {
-                            int stringTotal = 0;
-                            int lineCounter = lineparts.Count(sum =>
+                            textBuff = _currentContext.GetManager<IDragonAccessManager>().GetText();
+                        }
+                        else
+                        {
+                            textBuff = cachedText;
+                        }
+                        if (textBuff != null)
+                        {
+                            m.Result = (IntPtr)DragonDictationHelper.getCharLineIndex(textBuff, lineIndex);
+                            if (log.IsInfoEnabled)
                             {
-                                stringTotal += sum.Length + 1;
-                                if (stringTotal < position)
-                                {
-                                    return true;
-                                }
-                                return false;
-                            });
-
-                            m.Result = (IntPtr)(lineCounter - 1);
+                                log.InfoFormat("Line Pos from Point  C:{0},Line:{1}", lineIndex, (int)m.Result);
+                            }
                         }
                     }
                     break;

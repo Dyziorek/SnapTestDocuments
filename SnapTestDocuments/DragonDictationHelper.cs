@@ -130,5 +130,26 @@ namespace SnapTestDocuments
             }
             return 0;
         }
+
+
+        public static int getCharLineIndex(string textCharacters, int lineIndex)
+        {
+            String[] lineparts = textCharacters.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+            if (textCharacters.Length <= lineIndex)
+            {
+                return - 1;
+            }
+            else if (lineparts.Length > 0)
+            {
+                int stringTotal = 0;
+                var lineTextCounter = lineparts.Take(lineIndex); 
+                foreach(var textPart in lineTextCounter)
+                {
+                    stringTotal += textPart.Length + 1;
+                };
+                return stringTotal;
+            }
+            return -1;
+        }
     }
 }
