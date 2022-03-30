@@ -269,6 +269,10 @@ namespace SnapTestDocuments
                     if (maxPos == minPos)
                     {
                         this.SnapCtrl.Document.CaretPosition = this.SnapCtrl.Document.CreatePosition(minPos);
+                        if (!DragonDictationHelper.IsPositionVisible(this.SnapCtrl, this.SnapCtrl.Document.CaretPosition))
+                        {
+                            this.SnapCtrl.ScrollToCaret(0.1f);
+                        }
                     }
                     else
                     {
@@ -278,6 +282,10 @@ namespace SnapTestDocuments
                             maxPos = currentSectionOffset + currentSectionLength - 1;
                         }
                         this.SnapCtrl.Document.Selection = this.SnapCtrl.Document.CreateRange(minPos, maxPos - minPos);
+                        if (!DragonDictationHelper.IsPositionVisible(this.SnapCtrl, this.SnapCtrl.Document.Selection.Start))
+                        {
+                            DragonDictationHelper.ScrollRangeToVisible(this.SnapCtrl, this.SnapCtrl.Document.Selection);
+                        }
                     }
                     log.InfoFormat("DragAccMgrCmn  Set Sel at:{0} with {1}", minPos - currentSectionOffset, maxPos - minPos);
                     requestSelectPair = new Tuple<int, int>(minPos - currentSectionOffset, maxPos - currentSectionOffset);

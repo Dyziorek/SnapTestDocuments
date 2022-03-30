@@ -1,14 +1,16 @@
-﻿using System;
+﻿using DevExpress.Snap;
+using DevExpress.XtraRichEdit.API.Native;
+using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace SnapTestDocuments
 {
     class DragonDictationHelper
     {
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtSnapControl");
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("DragonDictationHelper");
         private Dictionary<int, int> mapEditSnapPos = new Dictionary<int, int>();
         private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
 
@@ -96,7 +98,7 @@ namespace SnapTestDocuments
             int editPos;
             if (!mapSnapEditPos.TryGetValue(snapPos, out editPos))
             {
-                log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                log.InfoFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
                 log.DebugFormat("Mapping Snap -> Edit {0}", mapSnapEditPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
                 {
                     x.Append(y).Append(" ");
@@ -150,6 +152,34 @@ namespace SnapTestDocuments
                 return stringTotal;
             }
             return -1;
+        }
+
+        public static bool IsPositionVisible(SnapControl snapControl, DocumentPosition position)
+        {
+            Rectangle bounds = snapControl.GetLayoutPhysicalBoundsFromPosition(position);
+            if (bounds == Rectangle.Empty)
+            {
+                log.Info("IsPositionVisible: Invalid Document Range");
+                return false;
+            }
+            Rectangle viewBounds = ((DevExpress.XtraRichEdit.IRichEditControl)snapControl).ViewBounds;
+            bounds.Offset(viewBounds.X, viewBounds.Y);
+            log.InfoFormat("IsPositionVisible: result {0}", viewBounds.Contains(bounds.Left, bounds.Top) && viewBounds.Contains(bounds.Right, bounds.Bottom));
+            return viewBounds.Contains(bounds.Left, bounds.Top) && viewBounds.Contains(bounds.Right, bounds.Bottom);
+        }
+
+        public static void ScrollRangeToVisible(SnapControl snapControl, DocumentRange range)
+        {
+            Rectangle bounds = snapControl.GetLayoutPhysicalBoundsFromPosition(range.Start);
+            if (bounds == Rectangle.Empty)
+            {
+                log.Info("ScrollRangeToVisible: Invalid Document Range");
+                return;
+            }
+            Rectangle viewBounds = ((DevExpress.XtraRichEdit.IRichEditControl)snapControl).ViewBounds;
+            int horizontalDiff = viewBounds.X - bounds.X;
+            log.InfoFormat("Scroll Document to distance {0}", horizontalDiff);
+            snapControl.VerticalScrollValue += horizontalDiff;
         }
     }
 }
