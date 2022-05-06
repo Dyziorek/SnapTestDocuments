@@ -20,6 +20,8 @@ namespace SnapTestDocuments
         /// </summary>
         private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
 
+        private int SnapMaxPos;
+        private int EditMaxPos;
         /// <summary>
         /// Mapping Snap to Edit postions and vice versa
         /// This code is to simulate TextEdit like behavior in SnapControl
@@ -70,6 +72,8 @@ namespace SnapTestDocuments
             {
                 mapEditSnapPos = dictEditPosData;
                 mapSnapEditPos = dictSnapPosData;
+                EditMaxPos = mapEditSnapPos.Max(check => check.Key) + 1;
+                SnapMaxPos = mapSnapEditPos.Max(check => check.Key) + 1;
             }
             if (log.IsDebugEnabled)
             {
@@ -113,36 +117,76 @@ namespace SnapTestDocuments
                 {
                     dictSnapPosData.Add(mapEdits.Key + snapTextOffset, mapEdits.Value + editTextOffset);
                 }
-                snapTextOffset = snapTextOffset + mapping.Item1.Max( cmp => cmp.Value ) + tuples.Item2 + 1;
-                editTextOffset = editTextOffset + mapping.Item1.Max( cmp => cmp.Key ) + 1;
+                if (tuples.Item2 > 0)                                               // TODO : review this code because make errors???
+                {
+                    int editValue = dictSnapPosData.Max(cmp => cmp.Value) + 1;
+                    int snapValue = dictSnapPosData.Max(cmp => cmp.Key) + 1;
+                    for(int index = 0; index < tuples.Item2; index++)
+                    {
+                        dictSnapPosData.Add(snapValue + index, editValue);
+                    }
+                }
+
+                editTextOffset = editTextOffset + mapping.Item1.Max(cmp => cmp.Key) + 1;
+                snapTextOffset = snapTextOffset + mapping.Item1.Max(cmp => cmp.Value) + tuples.Item2 + 1;
             }
             mapEditSnapPos = dictEditPosData;
             mapSnapEditPos = dictSnapPosData;
+            EditMaxPos = mapEditSnapPos.Max(check => check.Key) + 1;
+            SnapMaxPos = mapSnapEditPos.Max(check => check.Key) + 1;
         }
 
-        public int EditToSnap(int editPos, [System.Runtime.CompilerServices.CallerMemberName] string CallMethod = null, [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
+        public int EditToSnap(int editPos, [System.Runtime.CompilerServices.CallerMemberName] string CallMethod = "", [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
         {
             int snapPos;
             if (!mapEditSnapPos.TryGetValue(editPos, out snapPos))
             {
-                log.InfoFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
-                snapPos = editPos;
+                if (editPos >= EditMaxPos)
+                {
+                    if (editPos == EditMaxPos)
+                    {
+                        log.InfoFormat("EditToSnap: Edit Pos just past max character count : {0} from {1}, at:{2}", editPos, CallMethod, LineNumber);
+                        snapPos = SnapMaxPos;
+
+                    }
+                    else
+                    {
+                        log.InfoFormat("EditToSnap: Edit Pos too large : {0} and max is {1} from {2}, at:{3}", editPos, EditMaxPos,  CallMethod, LineNumber);
+                        snapPos = SnapMaxPos;
+                    }
+                }
+                else
+                {
+                    log.InfoFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
+                    snapPos = editPos;
+                }
             }
             return snapPos;
         }
 
-        public int SnapToEdit(int snapPos,[System.Runtime.CompilerServices.CallerMemberName] string CallMethod = null,  [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
+        public int SnapToEdit(int snapPos, [System.Runtime.CompilerServices.CallerMemberName] string CallMethod = "",  [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
         {
             int editPos;
             if (!mapSnapEditPos.TryGetValue(snapPos, out editPos))
             {
-                log.InfoFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
-                log.DebugFormat("Mapping Snap -> Edit {0}", mapSnapEditPos.AsEnumerable().Aggregate(new StringBuilder(), (x, y) =>
+                if (snapPos >= SnapMaxPos)
                 {
-                    x.Append(y).Append(" ");
-                    return x;
-                }).ToString());
-                editPos = snapPos;
+                    if (snapPos == SnapMaxPos)
+                    {
+                        log.InfoFormat("SnapToEdit: Just past snap text range: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                        editPos = EditMaxPos;
+                    }
+                    else
+                    {
+                        log.InfoFormat("SnapToEdit: Snap post too large than text range: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                        editPos = EditMaxPos;
+                    }
+                }
+                else
+                {
+                    log.InfoFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                    editPos = snapPos;
+                }
             }
             return editPos;
         }
@@ -166,7 +210,7 @@ namespace SnapTestDocuments
                     }
                     return false;
                 });
-                return lineCounter - 1;
+                return lineCounter;
             }
             return 0;
         }

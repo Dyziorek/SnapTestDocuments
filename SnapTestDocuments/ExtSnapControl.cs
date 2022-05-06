@@ -34,6 +34,9 @@ namespace SnapTestDocuments
         DragonDictationHelper dictationHelper = new DragonDictationHelper();
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);  // start, end
         private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0);  // start, end
+
+        private Tuple<int, int> debugSelection = new Tuple<int, int>(0, 0);
+
         private string cachedText;
         private string lastcachedText;
         private int lastTextLength = -1;
@@ -222,12 +225,14 @@ namespace SnapTestDocuments
                     }
                     else
                     {
+                        if (debugSelection != lastselectionPair)
                         {
-                            log.InfoFormat("Check select in snap POS at {0}, {1}, text: {2}", lastselectionPair.Item1, lastselectionPair.Item2, Document.GetText(Document.CreateRange(lastselectionPair.Item1, lastselectionPair.Item2 - lastselectionPair.Item1)));
                             if (dictationHelper.SnapToEdit(lastselectionPair.Item1) < cachedText.Length && dictationHelper.SnapToEdit(lastselectionPair.Item2) < cachedText.Length)
                             {
+                                log.InfoFormat("Check select in snap POS at {0}, {1}, text: {2}", lastselectionPair.Item1, lastselectionPair.Item2, Document.GetText(Document.CreateRange(lastselectionPair.Item1, lastselectionPair.Item2 - lastselectionPair.Item1)));
                                 log.InfoFormat("Selection in edit Pos at {0}, {1}, text: {2}", dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2), cachedText.Substring(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2) - dictationHelper.SnapToEdit(lastselectionPair.Item1)));
                             }
+                            debugSelection = lastselectionPair;
                         }
                         lastCaretPos = new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2));
                     }
@@ -582,8 +587,8 @@ namespace SnapTestDocuments
                     {
                         if (fieldData.Range.Start.ToInt() > initialRange)
                         {
-                            stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange))), fieldData.CodeRange.Length));
-                            stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(fieldData.ResultRange)), 0));
+                            stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange))), fieldData.CodeRange.Length + 2));
+                            stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(fieldData.ResultRange)), 1));
                             initialRange = fieldData.Range.End.ToInt();
                         }
                     }

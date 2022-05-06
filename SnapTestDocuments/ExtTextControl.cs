@@ -74,13 +74,13 @@ namespace SnapTestDocuments
                     }
                     break;
                 case 0xb8: // EM_GETMODIFY
-                    log.InfoFormat("Message:  GetModify, Lparam: {1}, WParam {2}, ret {3}", m.LParam, m.WParam, m.Result);
+                    log.InfoFormat("Message:  GetModify, Lparam: {0}, WParam {1}, ret {2}", m.LParam, m.WParam, m.Result);
                     break;
                 case 0x31:
-                    log.InfoFormat("Message:  GetFont, Lparam: {1}, WParam {2}, ret {3}", m.LParam, m.WParam, m.Result);
+                    log.InfoFormat("Message:  GetFont, Lparam: {0}, WParam {1}, ret {2}", m.LParam, m.WParam, m.Result);
                     break;
                 default:
-                    log.InfoFormat("Message:  ID: 0x{0:x}, Lparam: {1}, WParam {2}, ret {3}", m.Msg, m.LParam, m.WParam, m.Result);
+                    log.InfoFormat("Message:  ID: 0x{0:x}, Lparam: {0}, WParam {1}, ret {2}", m.Msg, m.LParam, m.WParam, m.Result);
                     break;
             }
             
