@@ -76,10 +76,7 @@ namespace SnapTestDocuments
                 if (context == null && ActiveSnapControl != "SnapControl")
                 {
                     context = new SnapContextImpl();
-                    if (ActiveSnapControl == "ExtSnapControl")
-                    {
-                        ((ExtSnapControl)snapControl2).SetContext = context;
-                    }
+
                     context.WorkControl = snapControl2;
                     //connector.Start(context);
                     context.GetManager<IDragonAccessManager>()?.UpdateSelectedItem(new DocumentEntityBase{ name = "", Type = DocumentEntityTypes.EmptySection});
@@ -232,6 +229,10 @@ namespace SnapTestDocuments
                             name = results,
                             Type = DocumentEntityTypes.InterpretationSection
                         };
+                        if (ActiveSnapControl == "ExtSnapControl")
+                        {
+                            ((ExtSnapControl)snapControl2).SetContext = context;
+                        }
                         context.GetManager<IDragonAccessManager>().UpdateSelectedItem(this.selectedItem);
                         break;
                     }

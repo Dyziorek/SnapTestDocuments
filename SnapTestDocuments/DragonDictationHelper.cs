@@ -11,7 +11,13 @@ namespace SnapTestDocuments
     class DragonDictationHelper
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("DragonDictationHelper");
+        /// <summary>
+        /// Index Edit position to Snap Position - keys are larger tah values
+        /// </summary>
         private Dictionary<int, int> mapEditSnapPos = new Dictionary<int, int>();
+        /// <summary>
+        /// Index Snap position to Edit Position - keys are smaller than values
+        /// </summary>
         private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
 
         /// <summary>
@@ -32,7 +38,7 @@ namespace SnapTestDocuments
         /// for postion 9 returns 9 but for position 15 returns 14.
         /// </summary>
         /// <param name="textSection">Text content on which Dragon dication is working</param>
-        public void MapTextPositions(string textSection)
+        public Tuple<Dictionary<int, int>, Dictionary<int, int>> MapTextPositions(string textSection, bool append = false)
         {
             var dictEditPosData = new Dictionary<int, int>();
             var dictSnapPosData = new Dictionary<int, int>();
@@ -41,24 +47,30 @@ namespace SnapTestDocuments
             {
                 int sumTextEdit = 0;
                 int sumTextSnap = 0;
-                foreach (string lineText in lineparts)
+                
+                for (int indexLine = 0; indexLine < lineparts.Length; indexLine++)
                 {
-
+                    string lineText = lineparts[indexLine];
                     for (int charIdx = 0; charIdx < lineText.Length; charIdx++)
                     {
                         dictEditPosData[charIdx + sumTextEdit] = charIdx + sumTextSnap;
                         dictSnapPosData[charIdx + sumTextSnap] = charIdx + sumTextEdit;
                     }
-                    dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length + sumTextSnap;
-                    dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
-                    dictSnapPosData[lineText.Length + sumTextSnap] = lineText.Length + sumTextEdit;
+                    if (!append || indexLine != lineparts.Length - 1)
+                    {
+                        dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length + sumTextSnap;
+                        dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
+                        dictSnapPosData[lineText.Length + sumTextSnap] = lineText.Length + sumTextEdit;
+                    }
                     sumTextEdit += lineText.Length + 2;
                     sumTextSnap += lineText.Length + 1;
                 }
             }
-            mapEditSnapPos = dictEditPosData;
-            mapSnapEditPos = dictSnapPosData;
-
+            if (!append)
+            {
+                mapEditSnapPos = dictEditPosData;
+                mapSnapEditPos = dictSnapPosData;
+            }
             if (log.IsDebugEnabled)
             {
                 int diffValue = 0;
@@ -80,6 +92,32 @@ namespace SnapTestDocuments
                     return x;
                 }).ToString());
             }
+
+            return new Tuple<Dictionary<int, int>, Dictionary<int, int>>(dictEditPosData, dictSnapPosData);
+        }
+
+        public void MapTextPositions(List<Tuple<string, int>> textSections)
+        {
+            int snapTextOffset = 0;
+            int editTextOffset = 0;
+            var dictEditPosData = new Dictionary<int, int>();
+            var dictSnapPosData = new Dictionary<int, int>();
+            foreach (var tuples in textSections)
+            {
+                var mapping = MapTextPositions(tuples.Item1, true);
+                foreach(var mapEdits in mapping.Item1)
+                {
+                    dictEditPosData.Add(mapEdits.Key + editTextOffset, mapEdits.Value + snapTextOffset);
+                }
+                foreach (var mapEdits in mapping.Item2)
+                {
+                    dictSnapPosData.Add(mapEdits.Key + snapTextOffset, mapEdits.Value + editTextOffset);
+                }
+                snapTextOffset = snapTextOffset + mapping.Item1.Max( cmp => cmp.Value ) + tuples.Item2 + 1;
+                editTextOffset = editTextOffset + mapping.Item1.Max( cmp => cmp.Key ) + 1;
+            }
+            mapEditSnapPos = dictEditPosData;
+            mapSnapEditPos = dictSnapPosData;
         }
 
         public int EditToSnap(int editPos, [System.Runtime.CompilerServices.CallerMemberName] string CallMethod = null, [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)

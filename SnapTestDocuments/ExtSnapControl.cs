@@ -12,6 +12,20 @@ using System.Text;
 namespace SnapTestDocuments
 {
 
+    public class QString
+    {
+        public String Text { get; set; }
+        public QString(string member)
+        {
+            Text = member;
+        }
+
+        public override string ToString()
+        {
+            return "'" + Text + "'";
+        }
+    }
+
     public class ExtSnapControl : DevExpress.Snap.SnapControl
     {
 
@@ -170,6 +184,10 @@ namespace SnapTestDocuments
                 else
                 {
                     Document.Selection = Document.CreateRange(minPos, maxPos - minPos);
+                    {
+                        log.InfoFormat("Requested select at {0}, {1}, text: {2}", wparam, lparam, cachedText.Substring(wparam, lparam-wparam));
+                        log.InfoFormat("Selected at {0}, {1}, text: {2}", minPos, maxPos, Document.GetText(Document.Selection));
+                    }
                 }
             }
             return new Tuple<int, int>(minPos, maxPos);
@@ -204,6 +222,13 @@ namespace SnapTestDocuments
                     }
                     else
                     {
+                        {
+                            log.InfoFormat("Check select in snap POS at {0}, {1}, text: {2}", lastselectionPair.Item1, lastselectionPair.Item2, Document.GetText(Document.CreateRange(lastselectionPair.Item1, lastselectionPair.Item2 - lastselectionPair.Item1)));
+                            if (dictationHelper.SnapToEdit(lastselectionPair.Item1) < cachedText.Length && dictationHelper.SnapToEdit(lastselectionPair.Item2) < cachedText.Length)
+                            {
+                                log.InfoFormat("Selection in edit Pos at {0}, {1}, text: {2}", dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2), cachedText.Substring(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2) - dictationHelper.SnapToEdit(lastselectionPair.Item1)));
+                            }
+                        }
                         lastCaretPos = new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2));
                     }
                     
@@ -548,8 +573,32 @@ namespace SnapTestDocuments
             if (_currentContext == null)
             {
                 cachedText = Text;
-                dictationHelper.MapTextPositions(cachedText);
 
+                if (Document.Fields?.Count > 0)
+                {
+                    var stringParts = new List<Tuple<QString, int>>();
+                    int initialRange = Document.Range.Start.ToInt();
+                    foreach(var fieldData in Document.Fields)
+                    {
+                        if (fieldData.Range.Start.ToInt() > initialRange)
+                        {
+                            stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange))), fieldData.CodeRange.Length));
+                            stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(fieldData.ResultRange)), 0));
+                            initialRange = fieldData.Range.End.ToInt();
+                        }
+                    }
+                    stringParts.Add(new Tuple<QString, int>(new QString(Document.GetText(Document.CreateRange(initialRange, Document.Range.End.ToInt() - initialRange))) ,0));
+
+                    var tups = stringParts.ConvertAll(elemX => new Tuple<string, int>(elemX.Item1.Text, elemX.Item2));
+
+                    dictationHelper.MapTextPositions(tups);
+
+
+                }
+                else
+                {
+                    dictationHelper.MapTextPositions(cachedText);
+                }
                 log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
             }
         }

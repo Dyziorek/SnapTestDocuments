@@ -14,7 +14,7 @@ namespace SnapTestDocuments
         private DocumentEntityBase currentSelectedInterp = null;
         private ITextFieldInfo currentSectionField = null;
         int currentSectionOffset = 0;
-        private Tuple<int, int> lastselectionPair = new Tuple<int, int>(0, 0); //start, end
+        private Tuple<int, int> lastSelectionPair = new Tuple<int, int>(0, 0); //start, end
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(0, 0);
         private Tuple<int, Rectangle> lastCharRect = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
         private string cacheStringText = null;
@@ -41,9 +41,9 @@ namespace SnapTestDocuments
             {
                 if (log.IsInfoEnabled)
                 {
-                    log.InfoFormat("DragAccMgrCmn GetSel local:{0} mapped:{1}", lastselectionPair, new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2)));
+                    log.InfoFormat("DragAccMgrCmn GetSel local:{0} mapped:{1}", lastSelectionPair, new Tuple<int, int>(dictationHelper.SnapToEdit(lastSelectionPair.Item1), dictationHelper.SnapToEdit(lastSelectionPair.Item2)));
                 }
-                return new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2));
+                return new Tuple<int, int>(dictationHelper.SnapToEdit(lastSelectionPair.Item1), dictationHelper.SnapToEdit(lastSelectionPair.Item2));
             }
             log.InfoFormat("DragAccMgrCmn GetSel returns zero p:{0}, l:{1}", 0, 0);
             return new Tuple<int, int>(0, 0);
@@ -100,7 +100,7 @@ namespace SnapTestDocuments
                     }
 
                     log.InfoFormat("DragAccMgrCmn Current Selection begin:{0}, end:{1}", minPos, maxPos);
-                    lastselectionPair = new Tuple<int, int>(minPos, maxPos);
+                    lastSelectionPair = new Tuple<int, int>(minPos, maxPos);
                 }
                 else
                 {
@@ -166,7 +166,7 @@ namespace SnapTestDocuments
                 else
                 {
                     this.currentSelectedInterp = null;
-                    this.lastselectionPair = new Tuple<int, int>(0, 0);
+                    this.lastSelectionPair = new Tuple<int, int>(0, 0);
                     this.currentSectionField = null;
                     currentSectionOffset = 0;
                 }
@@ -174,7 +174,7 @@ namespace SnapTestDocuments
             else
             {
                 this.currentSelectedInterp = null;
-                this.lastselectionPair = new Tuple<int, int>(0, 0);
+                this.lastSelectionPair = new Tuple<int, int>(0, 0);
                 this.currentSectionField = null;
                 currentSectionOffset = 0;
             }
@@ -189,15 +189,15 @@ namespace SnapTestDocuments
                     if (this.currentSelectedInterp != null && this.currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField))
                     {
                         var selection = this.SnapCtrl.Document.Selection;
-                        if (lastselectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2 && requestSelectPair.Item1 + currentSectionOffset + 1 == selection.Start.ToInt())
+                        if (lastSelectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2 && requestSelectPair.Item1 + currentSectionOffset + 1 == selection.Start.ToInt())
                         {
                             // Dragon resets selected word to single cursor after selected word just before replacing this with new word
                             // so we need to restore selection before replacing
                             if (log.IsDebugEnabled)
                             {
-                                log.DebugFormat("Use cached selection: current sel: {0} , cache sel:{1}, snap selection pos {3}", requestSelectPair, lastselectionPair, selection.Start.ToInt());
+                                log.DebugFormat("Use cached selection: current sel: {0} , cache sel:{1}, snap selection pos {3}", requestSelectPair, lastSelectionPair, selection.Start.ToInt());
                             }
-                            selection = this.SnapCtrl.Document.CreateRange(lastselectionPair.Item1 + currentSectionOffset, Math.Abs(lastselectionPair.Item2 - lastselectionPair.Item1));
+                            selection = this.SnapCtrl.Document.CreateRange(lastSelectionPair.Item1 + currentSectionOffset, Math.Abs(lastSelectionPair.Item2 - lastSelectionPair.Item1));
                         }
 
                         if (selection.Start.ToInt() > currentSectionField.Field.ToSnap().ResultRange.End.ToInt())
@@ -227,10 +227,11 @@ namespace SnapTestDocuments
                             {
                                 docFragment.EndUpdate();
                                 selection.EndUpdateDocument(docFragment);
-                                log.InfoFormat("DragAccMgrCmn Replace last Selection begin:{0}, end:{1}", selection.End.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
+                                int endSelectionPoint = selection.End.ToInt() - currentSectionOffset;
+                                log.InfoFormat("DragAccMgrCmn Replace last Selection begin:{0}, end:{1}", endSelectionPoint, endSelectionPoint);
                                 DragonAccessManagerCmn_ContentChanged(this, EventArgs.Empty);
                                 this.SnapCtrl.Document.CaretPosition = selection.End;
-                                lastselectionPair = new Tuple<int, int>(selection.End.ToInt() - currentSectionOffset, selection.End.ToInt() - currentSectionOffset);
+                                lastSelectionPair = new Tuple<int, int>(endSelectionPoint, endSelectionPoint);
                                 log.InfoFormat("DragAccMgrCmn Whole Section Text after replace:'{0}'", cacheStringText);
                             }
 
