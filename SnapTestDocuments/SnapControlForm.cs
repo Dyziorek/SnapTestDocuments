@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using DevExpress.Snap;
+using DevExpress.XtraRichEdit.Services;
 
 namespace SnapTestDocuments
 {
@@ -72,12 +73,14 @@ namespace SnapTestDocuments
                 {
                     success = snapControl2.LoadDocument(textBox1.Text, DevExpress.XtraRichEdit.DocumentFormat.Rtf);
                 }
-                snapControl2.Options.Bookmarks.Visibility = DevExpress.XtraRichEdit.RichEditBookmarkVisibility.Visible;
+                
                 if (context == null && ActiveSnapControl != "SnapControl")
                 {
-                    context = new SnapContextImpl();
-
-                    context.WorkControl = snapControl2;
+                    context = new SnapContextImpl
+                    {
+                        WorkControl = snapControl2,
+                        FormControl = this
+                    };
                     //connector.Start(context);
                     context.GetManager<IDragonAccessManager>()?.UpdateSelectedItem(new DocumentEntityBase{ name = "", Type = DocumentEntityTypes.EmptySection});
                 }

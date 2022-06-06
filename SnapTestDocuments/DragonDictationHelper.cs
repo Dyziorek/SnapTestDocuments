@@ -44,7 +44,7 @@ namespace SnapTestDocuments
         {
             var dictEditPosData = new Dictionary<int, int>();
             var dictSnapPosData = new Dictionary<int, int>();
-            String[] lineparts = textSection.Split(new string[] { "\r\n" }, StringSplitOptions.None);
+            string[] lineparts = textSection.Split(new string[] { "\r\n" }, StringSplitOptions.None);
             if (lineparts.Length > 0)
             {
                 int sumTextEdit = 0;
@@ -117,7 +117,7 @@ namespace SnapTestDocuments
                 {
                     dictSnapPosData.Add(mapEdits.Key + snapTextOffset, mapEdits.Value + editTextOffset);
                 }
-                if (tuples.Item2 > 0)                                               // TODO : review this code because make errors???
+                if (tuples.Item2 > 0 && !string.IsNullOrEmpty(tuples.Item1))                                               // TODO : review this code because make errors???
                 {
                     int editValue = dictSnapPosData.Max(cmp => cmp.Value) + 1;
                     int snapValue = dictSnapPosData.Max(cmp => cmp.Key) + 1;
@@ -127,8 +127,16 @@ namespace SnapTestDocuments
                     }
                 }
 
-                editTextOffset = editTextOffset + mapping.Item1.Max(cmp => cmp.Key) + 1;
-                snapTextOffset = snapTextOffset + mapping.Item1.Max(cmp => cmp.Value) + tuples.Item2 + 1;
+                if (mapping.Item1.Count > 0)
+                {
+                    editTextOffset = editTextOffset + mapping.Item1.Max(cmp => cmp.Key) + 1;
+                    snapTextOffset = snapTextOffset + mapping.Item1.Max(cmp => cmp.Value) + tuples.Item2 + 1;
+                }
+                else
+                {
+                    editTextOffset++;
+                    snapTextOffset += tuples.Item2 + 1;
+                }
             }
             mapEditSnapPos = dictEditPosData;
             mapSnapEditPos = dictSnapPosData;
@@ -189,6 +197,41 @@ namespace SnapTestDocuments
                 }
             }
             return editPos;
+        }
+
+        public bool HandleWorkFieldSelection(SnapControl snapControl, Field fieldEdited, string replaceText)
+        {
+            SnapControl _snapCtrlContext = snapControl;
+            if (fieldEdited.CodeRange.Length == 56)
+            {
+                Field field = _snapCtrlContext.Document.Fields.First();
+                
+                var rangeToReplace = field.ResultRange;
+
+                var subDocumentUpdate = rangeToReplace.BeginUpdateDocument();
+                try
+                {
+                    subDocumentUpdate.BeginUpdate();
+                    subDocumentUpdate.Replace(rangeToReplace, replaceText);
+                }
+                finally
+                {
+                    subDocumentUpdate.EndUpdate();
+                    rangeToReplace.EndUpdateDocument(subDocumentUpdate);
+                }
+                //selection needs to be removed
+                //_snapCtrlContext.Document.Selection = subDocument.CreateRange(field.ResultRange.Start, 0);
+
+                //caret position does NOT need to be set
+                //_snapCtrlContext.Document.CaretPosition = _snapCtrlContext.Document.CreatePosition(field.ResultRange.End.Position - 1);
+
+
+                //Not neeeded - Key should be normally handled by the Snap Control
+                //snapSubDocument.InsertText(fieldsCol[0].ResultRange.Start, chr.ToString());
+                return true;
+
+            }
+            return false;
         }
 
         public static int getLineFromText(string textCharacters, int position)

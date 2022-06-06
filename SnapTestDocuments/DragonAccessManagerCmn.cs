@@ -1,5 +1,6 @@
 ﻿using DevExpress.XtraRichEdit.API.Native;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -112,11 +113,13 @@ namespace SnapTestDocuments
         private void DragonAccessManagerCmn_ContentChanged(object sender, EventArgs e)
         {
             log.Debug("SnapControl_ContentChanged:");
+            bool textMapped = false;
             if (this.currentSelectedInterp != null)
             {
                 if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField.Field))
                 {
                     bool lastParMark = false;
+                    
                     cacheStringText = this.SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
                     var paragraphs = this.SnapCtrl.Document.Paragraphs.Get(currentSectionField.Field.ToSnap().ResultRange);
                     foreach(var parItem in paragraphs)
@@ -130,6 +133,58 @@ namespace SnapTestDocuments
                     {
                         cacheStringText += "\r\n";
                     }
+                    var sectionRange = currentSectionField.Field.ToSnap().ResultRange;
+                    var allEntities = SnapFieldTools.GetEntitiesInRange(SnapCtrl.Document, sectionRange);
+                    var allElements = new List<Tuple<int, Field, DocumentRange, string>>();/*SnapFieldTools.GetElementsInRange(SnapCtrl.Document, sectionRange);*/
+
+                    if (allElements.Count() != allEntities.Count() && allElements.Count > 0)
+                    {
+                        var stringParts = new List<Tuple<string, int>>();
+                        int initialRange = sectionRange.Start.ToInt();
+                        var sortedTuples = allElements.OrderBy(sorter => sorter.Item3.Start.ToInt());
+                        foreach (var tupleData in sortedTuples)
+                        {
+                            if (tupleData.Item2 == null) // bookmark
+                            {
+                                if(tupleData.Item3.Start.ToInt() > initialRange)
+                                {
+                                    stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, tupleData.Item3.Start.ToInt() - initialRange)), tupleData.Item3.Length + 2));
+                                    stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(tupleData.Item3), 1));
+                                    initialRange = tupleData.Item3.End.ToInt();
+                                }
+                            }
+                            else
+                            {
+                                if (tupleData.Item2.Range.Start.ToInt() >= initialRange)
+                                {
+                                    stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, tupleData.Item2.Range.Start.ToInt() - initialRange)), tupleData.Item2.CodeRange.Length + 2));
+                                    stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(tupleData.Item2.ResultRange), 1));
+                                    initialRange = tupleData.Item2.Range.End.ToInt();
+                                }
+                            }
+                        }
+                        stringParts.Add(new Tuple<string, int>((SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, sectionRange.End.ToInt() - initialRange))), 0));
+                        dictationHelper.MapTextPositions(stringParts);
+                        textMapped = true;
+                    }
+                    else if (allEntities.Count() > 0)
+                    {
+                        var stringParts = new List<Tuple<string, int>>();
+                        int initialRange = sectionRange.Start.ToInt();
+                        foreach (var fieldData in allEntities)
+                        {
+                            if (fieldData.Field.Range.Start.ToInt() > initialRange)
+                            {
+                                stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, fieldData.Field.Range.Start.ToInt() - initialRange)), fieldData.Field.CodeRange.Length + 2));
+                                stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(fieldData.Field.ResultRange), 1));
+                                initialRange = fieldData.Field.Range.End.ToInt();
+                            }
+                        }
+                        stringParts.Add(new Tuple<string, int>((SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, sectionRange.End.ToInt() - initialRange))), 0));
+                        dictationHelper.MapTextPositions(stringParts);
+                        textMapped = true;
+                    }
+                    ShowMappingTexts();
                 }
                 else
                 {
@@ -140,8 +195,35 @@ namespace SnapTestDocuments
             else
                 cacheStringText = string.Empty;
 
-            dictationHelper.MapTextPositions(cacheStringText);
+            if (!textMapped)
+            {
+                dictationHelper.MapTextPositions(cacheStringText);
+            }
             log.InfoFormat("DragAccMgrCmn: SnapControl_ContentChanged - updated text: '{0}'", cacheStringText);
+        }
+
+
+
+        private void ShowMappingTexts()
+        {
+            FindTexts("Satisfactory");
+            FindTexts("EPITHELIAL");
+            FindTexts("Low-grade");
+            FindTexts("result");
+        }
+
+        private void FindTexts(string textPart)
+        {
+            var searchResult = SnapCtrl.Document.StartSearch(textPart, SearchOptions.None, SearchDirection.Forward);
+            if (searchResult.FindNext())
+            {
+                if (searchResult.CurrentResult != null)
+                {
+                    int minPos = searchResult.CurrentResult.Start.ToInt() - currentSectionOffset;
+                    int textMinPos = cacheStringText.IndexOf(textPart);
+                    snapCtrlCtx.MainForm.textBox1.Text += String.Format("\r\n'{2}' text:{0}, snap:{1}", textMinPos, minPos, textPart);
+                }
+            }
         }
 
         public bool HasSections()

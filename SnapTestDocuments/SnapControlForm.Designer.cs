@@ -1,4 +1,6 @@
 ﻿
+using DevExpress.XtraRichEdit.Services;
+
 namespace SnapTestDocuments
 {
     partial class SnapControlForm
@@ -115,7 +117,11 @@ namespace SnapTestDocuments
             this.snapControl2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.snapControl2.Location = new System.Drawing.Point(0, 0);
             this.snapControl2.Name = "snapControl2";
+            this.snapControl2.Options.Authentication.UserName = "Regular User";
+            this.snapControl2.Options.Bookmarks.Visibility = DevExpress.XtraRichEdit.RichEditBookmarkVisibility.Visible;
             this.snapControl2.Options.DocumentCapabilities.TrackChanges = DevExpress.XtraRichEdit.DocumentCapability.Disabled;
+            this.snapControl2.Options.Fields.HighlightColor = System.Drawing.Color.LawnGreen;
+            this.snapControl2.Options.Fields.HighlightMode = DevExpress.XtraRichEdit.FieldsHighlightMode.Always;
             this.snapControl2.Options.SnapMailMergeVisualOptions.DataSourceName = null;
             this.snapControl2.Size = new System.Drawing.Size(909, 506);
             this.snapControl2.TabIndex = 0;
@@ -255,7 +261,6 @@ namespace SnapTestDocuments
 
         private System.Windows.Forms.OpenFileDialog openFileDialog1;
         private System.Windows.Forms.Button bntOpen;
-        private SnapTestDocuments.ExtTextControl textBox1;
         private System.Windows.Forms.Label label1;
         private DevExpress.Snap.Extensions.SnapDockManager snapDockManager1;
         private System.Windows.Forms.Button btnSaveDoc;
@@ -271,6 +276,7 @@ namespace SnapTestDocuments
         private System.Windows.Forms.ListBox lbSections;
         private System.Windows.Forms.Button button1;
         private ExtSnapControl snapControl2;
+        public ExtTextControl textBox1;
     }
 }
 

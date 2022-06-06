@@ -8,6 +8,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using TextEditor.Core.API;
+using DevExpress.XtraRichEdit.Services;
 
 namespace TextEditor.Core.API
 {
@@ -69,6 +70,16 @@ namespace SnapTestDocuments
 
     }
 
+    public class UserListService : IUserListService
+    {
+        public IList<string> GetUsers()
+        {
+            List<string> l = new List<string>();
+            l.Add("Regular User");
+            return l;
+        }
+    }
+
     public interface ISubDocument : System.IEquatable<ISubDocument>
     {
         IFieldCollection Fields { get; }
@@ -91,6 +102,8 @@ namespace SnapTestDocuments
     {
         DevExpress.Snap.SnapControl SnapControl { get; }
         DevExpress.Snap.Core.API.SnapDocument SnapDocument { get; }
+
+        SnapControlForm MainForm { get; }
     }
 
     public interface ISnapReportContext
@@ -177,7 +190,7 @@ namespace SnapTestDocuments
         }
     }
 
-    public class SnapMangerContainer<T> where T : class
+    public class SnapManagerContainer<T> where T : class
     {
         private Dictionary<Type, T> items = new Dictionary<Type, T>();
         public P Get<P>() where P : T
@@ -196,13 +209,16 @@ namespace SnapTestDocuments
 
     public class SnapContextImpl : ISnapCtrlContext
     {
-        SnapMangerContainer<ITextEditManager> manager = new SnapTestDocuments.SnapMangerContainer<ITextEditManager>();
+        SnapManagerContainer<ITextEditManager> manager = new SnapTestDocuments.SnapManagerContainer<ITextEditManager>();
         DragonAccessManagerCmn dragonWork = null;
         public DevExpress.Snap.SnapControl WorkControl { get; set; }
+        public SnapControlForm FormControl { get; set; }
         SectionManagerImpl sectioner = null;
 
 
         public DevExpress.Snap.SnapControl SnapControl => WorkControl;
+
+        public SnapControlForm MainForm => FormControl;
 
         public DevExpress.Snap.Core.API.SnapDocument SnapDocument => WorkControl.Document;
 
@@ -378,6 +394,35 @@ namespace SnapTestDocuments
         }
 
         public static ITextFieldInfo GetTextFieldInfo(this Field field, SnapDocument subDocument) => new SnapFieldInfo(field, subDocument);
+
+
+
+        public static IEnumerable<SnapEntity> GetEntitiesInRange(SnapSubDocument document, DocumentRange range)
+        {
+            HashSet<SnapEntity> result = new HashSet<SnapEntity>();
+            if ((document != null) && (range != null) && (range.Length > 0))
+            {
+                List<Field> fields = document.Fields.Where(p => (p != null) && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(range, p.Range)).ToList<Field>();
+                result.UnionWith(fields.Select(p => document.ParseField(p)));
+
+            }
+            return result;
+        }
+
+        public static IEnumerable<Tuple<int, Field, DocumentRange, string>> GetElementsInRange(SnapSubDocument document, DocumentRange range)
+        {
+            List<Tuple<int, Field, DocumentRange, string>> result = new List<Tuple<int, Field, DocumentRange, string>>();
+            if ((document != null) && (range != null) && (range.Length > 0))
+            {
+                List<Field> fields = document.Fields.Where(p => (p != null) && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(range, p.Range)).ToList<Field>();
+                result.AddRange(fields.Select(fld => new Tuple<int, Field, DocumentRange, string>(fld.Range.Start.ToInt(), fld, fld.Range, document.GetText(fld.CodeRange))));
+
+                List<Bookmark> ts = document.Bookmarks.Where(bkm => (bkm != null) && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(range, bkm.Range)).ToList<Bookmark>();
+
+                result.AddRange(ts.Select(b => new Tuple<int, Field, DocumentRange, string>(b.Range.Start.ToInt(), null,  b.Range, b.Name)));
+            }
+            return result;
+        }
 
     }
 

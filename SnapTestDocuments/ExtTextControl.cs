@@ -4,7 +4,7 @@ using System.Windows.Forms;
 namespace SnapTestDocuments
 {
 
-    class ExtTextControl : TextBox
+    public class ExtTextControl : TextBox
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("ExtTextControl");
 
