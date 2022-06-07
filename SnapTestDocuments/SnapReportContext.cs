@@ -47,6 +47,8 @@ namespace SnapTestDocuments
 
     public enum DocumentEntityTypes
     {
+        EditField,
+        CannedMessage,
         InterpretationSection,
         EmptySection
     }
@@ -55,7 +57,15 @@ namespace SnapTestDocuments
     {
         public string name;
         public DocumentEntityTypes Type;
+        public DocumentEntityBase Parent;
+
+        public DocumentEntityBase GetTopParent()
+        {
+            return null;
+        }
     }
+
+    
 
     public interface ITextFieldInfo
     {
@@ -106,10 +116,22 @@ namespace SnapTestDocuments
         SnapControlForm MainForm { get; }
     }
 
-    public interface ISnapReportContext
+    public interface ISnapReportContext : ITextEditWinFormsUIContext
     {
+    }
+
+
+    public interface ITextEditWinFormsUIContext
+    {
+        DevExpress.Snap.Core.API.SnapDocument Document { get; }
         T GetManager<T>() where T : ITextEditManager;
     }
+
+    public interface IPermissionManager : ITextEditManager
+    {
+        bool IsDocumentFieldEditable(Field editField);
+    }
+
 
     public interface IDragonAccessManager : ITextEditManager
     {
@@ -135,6 +157,117 @@ namespace SnapTestDocuments
         DevExpress.XtraRichEdit.API.Native.Field GetSectionField(DocumentEntityBase sectionEntity);
 
 
+    }
+
+    public interface ICustomFieldEditManager : ITextEditManager
+    {
+        bool IsEmptyEntityField(Field fieldCheck, DocumentEntityTypes editField);
+    }
+
+    public interface IEmptyMergeFieldCharacterPropertiesManager : ITextEditManager
+    {
+        void AddEmptyMergeFieldsCharacterProperties(Field field, SubDocument subDocument, DocumentRange characterPropertiesSourceDocRng);
+
+    }
+
+    public interface SelectionInfo
+    {
+        bool IsCaretPosInField { get;  }
+    }
+
+    public interface ISelectionChangedTrackingManager : ITextEditManager
+    {
+        SelectionInfo LastSelectionInfo { get; }
+    }
+
+    public class SelectionInfoImpl : SelectionInfo
+    {
+        ISnapCtrlContext workTracker;
+        public SelectionInfoImpl (ISnapCtrlContext worker)
+        {
+            workTracker = worker;
+        }
+        public bool IsCaretPosInField => workTracker.Document.Fields.Any(checkCursor => checkCursor.Range.Start.ToInt() > workTracker.Document.CaretPosition.ToInt() &&
+       checkCursor.Range.End.ToInt() < workTracker.Document.CaretPosition.ToInt());
+    }
+
+    public class SelectionChangedTrackingManagerImpl : ISelectionChangedTrackingManager
+    {
+        ISnapCtrlContext workTracker;
+        SelectionInfoImpl checkCursor;
+        public SelectionChangedTrackingManagerImpl(ISnapCtrlContext works)
+        {
+            workTracker = works;
+            checkCursor = new SelectionInfoImpl(workTracker);
+        }
+
+        public SelectionInfo LastSelectionInfo => checkCursor;
+
+        public void Clear()
+        {
+            
+        }
+
+        public void Init()
+        {
+            
+        }
+
+        public void Reset()
+        {
+            
+        }
+    }
+
+    public class CustomFieldEditManagerImpl : ICustomFieldEditManager
+    {
+        public bool IsEmptyEntityField(Field fieldCheck, DocumentEntityTypes editField)
+        {
+            return true;
+        }
+
+        public void Clear()
+        {
+
+        }
+
+        public void Init()
+        {
+
+        }
+
+        public void Reset()
+        {
+
+        }
+    }
+
+    public class EmptyMergeFieldCharacterPropertiesManagerImpl : IEmptyMergeFieldCharacterPropertiesManager
+    {
+        public void Clear()
+        {
+
+        }
+
+        public void Init()
+        {
+
+        }
+
+        public void Reset()
+        {
+
+        }
+
+        void AddEmptyMergeFieldsCharacterProperties(Field field, SubDocument subDocument, DocumentRange characterPropertiesSourceDocRng)
+        {
+
+        }
+
+        void IEmptyMergeFieldCharacterPropertiesManager.AddEmptyMergeFieldsCharacterProperties(Field field, SubDocument subDocument, DocumentRange characterPropertiesSourceDocRng)
+        {
+            
+        }
     }
 
     public class SectionManagerImpl : IInterpSectionsManager
@@ -214,9 +347,12 @@ namespace SnapTestDocuments
         public DevExpress.Snap.SnapControl WorkControl { get; set; }
         public SnapControlForm FormControl { get; set; }
         SectionManagerImpl sectioner = null;
-
+        SelectionChangedTrackingManagerImpl tracker;
+        EmptyMergeFieldCharacterPropertiesManagerImpl mergeFields = null;
 
         public DevExpress.Snap.SnapControl SnapControl => WorkControl;
+
+        public DevExpress.Snap.Core.API.SnapDocument Document => WorkControl.Document;
 
         public SnapControlForm MainForm => FormControl;
 
@@ -248,6 +384,33 @@ namespace SnapTestDocuments
                     sectioner = new SectionManagerImpl(this);
                     manager.Set((T)(ITextEditManager)sectioner);
                     return (T)(ITextEditManager)sectioner;
+                }
+            }
+
+            if (typeof(T) == typeof(IPermissionManager))
+            {
+                var pers = new SnapRangePermissionsTools();
+                manager.Set((T)(IPermissionManager)(pers));
+                return (T)(IPermissionManager)pers;
+            }
+
+            if ( typeof(T) == typeof(IEmptyMergeFieldCharacterPropertiesManager))
+            {
+                if (mergeFields == null)
+                {
+                    mergeFields = new EmptyMergeFieldCharacterPropertiesManagerImpl();
+                    manager.Set<T>((T)(IEmptyMergeFieldCharacterPropertiesManager)(mergeFields));
+                    return (T)(IEmptyMergeFieldCharacterPropertiesManager)mergeFields;
+                }
+            }
+
+            if (typeof(T) == typeof(ISelectionChangedTrackingManager))
+            {
+                if (tracker == null)
+                {
+                    tracker = new SelectionChangedTrackingManagerImpl(this);
+                    manager.Set<T>((T)(ISelectionChangedTrackingManager)(tracker));
+                    return (T)(ISelectionChangedTrackingManager)tracker;
                 }
             }
 
@@ -386,6 +549,15 @@ namespace SnapTestDocuments
             return false;
         }
 
+        public static IEnumerable<Field> GetFieldsInRange(SnapSubDocument document, DocumentRange range)
+        {
+            List<Field> result = new List<Field>();
+            if ((document != null))
+            {
+                result = document.Fields.Where(p => (p != null) && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(range, p.Range)).ToList<Field>();
+            }
+            return result;
+        }
 
         public static DevExpress.XtraRichEdit.API.Native.Field ToSnap(this IField field)
         {
@@ -419,7 +591,7 @@ namespace SnapTestDocuments
 
                 List<Bookmark> ts = document.Bookmarks.Where(bkm => (bkm != null) && SnapDocumentRangeTools.IsTargetDocumentRangeInBaseDocumentRange(range, bkm.Range)).ToList<Bookmark>();
 
-                result.AddRange(ts.Select(b => new Tuple<int, Field, DocumentRange, string>(b.Range.Start.ToInt(), null,  b.Range, b.Name)));
+                result.AddRange(ts.Select(b => new Tuple<int, Field, DocumentRange, string>(b.Range.Start.ToInt(), null, b.Range, b.Name)));
             }
             return result;
         }
@@ -454,8 +626,21 @@ namespace SnapTestDocuments
         }
     }
 
-    public class SnapRangePermissionsTools
+    public class SnapRangePermissionsTools : IPermissionManager
     {
+        public void Clear()
+        {
+
+        }
+
+        public void Init()
+        {
+
+        }
+
+        public void Reset()
+        {
+        }
 
         public static bool IsDocumentRangeEditableRange(SubDocument subDocument, DocumentRange docRange)
         {
@@ -475,6 +660,11 @@ namespace SnapTestDocuments
 
 
             return isEditable;
+        }
+
+        public bool IsDocumentFieldEditable(Field field)
+        {
+            return true;
         }
     }
 }
