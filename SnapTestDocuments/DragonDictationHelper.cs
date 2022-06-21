@@ -32,6 +32,7 @@ namespace SnapTestDocuments
                 return 0;
             }
         }
+
     }
 
     class DragonDictationHelper
@@ -107,18 +108,19 @@ namespace SnapTestDocuments
         /// Mapping Snap to Edit postions and vice versa
         /// This code is to simulate TextEdit like behavior in SnapControl
         /// The problem is caused by SnapControl counting new line characters as single position, but TextEdit counts as two.
-        /// So the solution for this issue is remapping positions for example we have text 'Test text\r\nNew Line'
+        /// So the solution for this issue is remapping positions for example we have text <code>'Test text\r\nNew Line'</code>
         /// In Edit control text has positions:
+        /// <code>
         /// Sample text:    T   e   s   t       t   e   x   t   \r  \n  N   e   w       l   i   n   e
         /// Edit Control:   0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15  16  17  18
         /// Snap Control:   0   1   2   3   4   5   6   7   8   9   9   10  11  12  13  14  15  16  17
-        /// 
-        /// Note that on Enter there is number gap wich makes Edit Control postion out of sync with Snap Control and more lines makes gap worsen
-        /// So mapping essetially tells Dragon that current postion in Edit control terms but navigates in Snap control positions.
-        /// When Dragon asks for positions application gets Snap control position then finds edit position based on snap postion
-        /// In this case for snap position of 9 edit is the same, but for position 15 edit postion is 16 and so on.
-        /// When Dragon request changes it tells in Edit position, so we need to obtain correct snap position for example
-        /// for postion 9 returns 9 but for position 15 returns 14.
+        /// </code>
+        /// <para>Note that on Enter there is number gap wich makes Edit Control postion out of sync with Snap Control and more lines makes gap worsen.</para>
+        /// So mapping essentially tells Dragon current position in Edit control terms but navigates internally in Snap control positions.
+        /// <para>When Dragon asks for positions application gets Snap control position then finds edit position based on snap postion
+        /// In this case for snap position of 9 edit is the same, but for position 15 edit postion is 16 and so on.</para>
+        /// <para>When Dragon request changes it tells in Edit position, so we need to obtain correct snap position for example
+        /// for postion 9 returns 9 but for position 15 returns 14.</para>
         /// </summary>
         /// <param name="textSection">Text content on which Dragon dication is working</param>
         public Tuple<Dictionary<int, int>, Dictionary<int, int>> MapTextPositions(string textSection, bool append = false)
@@ -234,7 +236,8 @@ namespace SnapTestDocuments
                 }
                 else if (tuples.Item2 > 0)
                 {
-                    snapTextOffset = snapTextOffset + tuples.Item2;
+                    snapTextOffset = snapTextOffset + tuples.Item2 + 1;
+                    editTextOffset = editTextOffset + 1;
                 }
             }
             mapEditSnapPos = dictEditToSnapPosData;
@@ -365,9 +368,9 @@ namespace SnapTestDocuments
             return viewBounds.Contains(bounds.Left, bounds.Top) && viewBounds.Contains(bounds.Right, bounds.Bottom);
         }
 
-        public static void ScrollRangeToVisible(SnapControl snapControl, DocumentRange range)
+        public static void ScrollRangeToVisible(SnapControl snapControl, Tuple<int, int> range)
         {
-            Rectangle bounds = snapControl.GetLayoutPhysicalBoundsFromPosition(range.Start);
+            Rectangle bounds = snapControl.GetLayoutPhysicalBoundsFromPosition(snapControl.Document.CreatePosition(range.Item1));
             if (bounds == Rectangle.Empty)
             {
                 log.Debug("Invalid Document Range");

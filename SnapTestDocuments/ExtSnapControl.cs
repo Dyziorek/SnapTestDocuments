@@ -8,6 +8,8 @@ using System.Security.Permissions;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Text;
+using DevExpress.XtraRichEdit.Commands;
+using System.Drawing;
 
 namespace SnapTestDocuments
 {
@@ -32,18 +34,24 @@ namespace SnapTestDocuments
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
         private ITextEditWinFormsUIContext _currentContext;
         DragonDictationHelper dictationHelper = new DragonDictationHelper();
-        private Tuple<int, int> requestSelectPair = new Tuple<int, int>(-1, -1);  // start, end
-        private Tuple<int, int> lastselectionPair = new Tuple<int, int>(-1, -1);  // start, end
+        private Tuple<int, int> requestSelectPair = new Tuple<int, int>(-1, -1);  // start, end in snap positions
+        private Tuple<int, int> lastSelectionPair = new Tuple<int, int>(-1, -1);  // start, end in snap positions
         private string cachedText;
         private string lastcachedText;
         private bool fieldTextChanged = false;
         private Tuple<bool, Field> adjustField = new Tuple<bool, Field>(false, null);
         private int lastTextLength = -1;
+        private static int charSize = Marshal.SizeOf(typeof(tagChar));
         IntPtr hOldFont = IntPtr.Zero;
         IntPtr oldRectPtr = IntPtr.Zero;
         System.Drawing.Rectangle rectData = System.Drawing.Rectangle.Empty;
         [System.Runtime.InteropServices.DllImport("GDI32.dll")]
         public static extern bool DeleteObject(IntPtr objectHandle);
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct tagChar
+        {
+            char charVal;
+        }
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
         {
@@ -119,9 +127,9 @@ namespace SnapTestDocuments
             if (!fieldProcessed)
             {
 
-                if (lastselectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2)
+                if (lastSelectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2)
                 {
-                    caretPos = Document.CreateRange(lastselectionPair.Item1, Math.Abs(lastselectionPair.Item2 - lastselectionPair.Item1));
+                    caretPos = Document.CreateRange(requestSelectPair.Item1, Math.Abs(requestSelectPair.Item2 - requestSelectPair.Item1));
                 }
                 string textToReplace = cachedText;
                 if (caretPos.End.ToInt() <= cachedText.Length)
@@ -148,8 +156,8 @@ namespace SnapTestDocuments
                     caretPos.EndUpdateDocument(docFragment);
                     ExtSnapControl_ContentChanged(this, EventArgs.Empty);
                     Document.CaretPosition = caretPos.End;
-                    lastselectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
-                    log.InfoFormat("Replaced text: {1} last selection is:{0}", lastselectionPair, messageText);
+                    lastSelectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
+                    log.InfoFormat("Replaced text: {1} last selection is:{0}", lastSelectionPair, messageText);
                 }
             }
         }
@@ -160,7 +168,6 @@ namespace SnapTestDocuments
             int minPos = Math.Min(wparam, lparam);
             int maxPos = Math.Max(wparam, lparam);
             log.InfoFormat("Request SetSelect from:{0} to: {1}", wparam, lparam);
-
 
             if (minPos > cachedText.Length)
             {
@@ -194,15 +201,48 @@ namespace SnapTestDocuments
                     }
                     if (!adjustedField && !requestSelectPair.Equals(new Tuple<int, int>(minPos, maxPos)))
                     {
-                        Document.CaretPosition = Document.CreatePosition(minPos);
+                        Document.BeginUpdate();
+                        var docCharPos = Document.CreatePosition(minPos);
+                        var rectObj = GetLayoutPhysicalBoundsFromPosition(docCharPos);
+                        var viewBounds = ViewBounds;
+                        viewBounds.Inflate((int)Math.Floor(-viewBounds.Width * 0.05f), (int)Math.Floor(-viewBounds.Height * 0.05f));
+                        rectObj.Offset(viewBounds.X, viewBounds.Y);
+                        Document.CaretPosition = docCharPos;
+                        log.InfoFormat("Client Rect : {0} View Rect: {1}", ClientRectangle, ViewBounds);
+                        if (rectObj == Rectangle.Empty || !viewBounds.Contains(rectObj.Left, rectObj.Top) || !viewBounds.Contains(rectObj.Right, rectObj.Bottom))
+                        {
+                            ScrollToCaret(0.3f);
+                        }
+                        Document.EndUpdate();
+
+                        //Document.CaretPosition = Document.CreatePosition(minPos);
                     }
                 }
                 else
                 {
-                    Document.Selection = Document.CreateRange(minPos, maxPos - minPos);
+                    if (!requestSelectPair.Equals(new Tuple<int, int>(minPos, maxPos)))
+                    {
+                        Document.BeginUpdate();
+                        var docCharPos = Document.CreatePosition(minPos);
+                        var rectObj = GetLayoutPhysicalBoundsFromPosition(docCharPos);
+                        var viewBounds = ViewBounds;
+                        viewBounds.Inflate((int)Math.Floor(-viewBounds.Width * 0.05f), (int)Math.Floor(-viewBounds.Height * 0.05f));
+                        rectObj.Offset(viewBounds.X, viewBounds.Y);
+                        Document.CaretPosition = docCharPos;
+                        log.InfoFormat("Client Rect : {0} View Rect: {1}", ClientRectangle, ViewBounds);
+                        if (rectObj == Rectangle.Empty || !viewBounds.Contains(rectObj.Left, rectObj.Top) || !viewBounds.Contains(rectObj.Right, rectObj.Bottom))
+                        {
+                            Document.CaretPosition = docCharPos;
+                            ScrollToCaret(0.3f);
+                        }
+                        Document.Selection = Document.CreateRange(minPos, maxPos - minPos);
+                        Document.EndUpdate();
+                    }
                 }
             }
             log.DebugFormat("SetSel returned minPos:{0}, maxPos:{1}", minPos, maxPos);
+           
+
             return new Tuple<int, int>(minPos, maxPos);
         }
 
@@ -236,7 +276,7 @@ namespace SnapTestDocuments
                         }
                         else
                         {
-                            lastCaretPos = new Tuple<int, int>(dictationHelper.SnapToEdit(lastselectionPair.Item1), dictationHelper.SnapToEdit(lastselectionPair.Item2));
+                            lastCaretPos = new Tuple<int, int>(dictationHelper.SnapToEdit(lastSelectionPair.Item1), dictationHelper.SnapToEdit(lastSelectionPair.Item2));
                         }
 
                         if (m.WParam != IntPtr.Zero)
@@ -282,6 +322,9 @@ namespace SnapTestDocuments
                         {
                             requestSelectPair = SetSelect((int)m.WParam, (int)m.LParam);
                         }
+
+                       
+
                         m.Result = (IntPtr)1;
                         log.InfoFormat("Updated Selection:  old: {1} new: {0} - result:{2}", requestSelectPair, new Tuple<int, int>((int)m.WParam, (int)m.LParam), m.Result);
                     }
@@ -330,17 +373,16 @@ namespace SnapTestDocuments
                     {
                         if (m.WParam.ToInt32() > 0)
                         {
-                            var textBuffPtr = System.Text.Encoding.Unicode.GetBytes(textBuff);
                             if (textBuff.Length >= m.WParam.ToInt32())
                             {
-                                Marshal.Copy(textBuffPtr, 0, m.LParam, m.WParam.ToInt32() - 1);
-                                Marshal.WriteByte(m.LParam, m.WParam.ToInt32(), 0);
+                                Marshal.Copy(textBuff.ToCharArray(), 0, m.LParam, m.WParam.ToInt32() - 1);
+                                Marshal.WriteByte(m.LParam, charSize * m.WParam.ToInt32(), 0);
                                 m.Result = (IntPtr)(m.WParam.ToInt32() - 1);
                             }
                             else
                             {
-                                Marshal.Copy(textBuffPtr, 0, m.LParam, textBuffPtr.Length);
-                                Marshal.WriteInt32(m.LParam, textBuffPtr.Length, 0);
+                                Marshal.Copy(textBuff.ToCharArray(), 0, m.LParam, textBuff.Length);
+                                Marshal.WriteInt16(m.LParam, textBuff.Length * charSize, 0);
                                 m.Result = (IntPtr)(textBuff.Length);
                             }
                         }
@@ -350,7 +392,7 @@ namespace SnapTestDocuments
                         }
                         if (!string.Equals(lastcachedText, cachedText))
                         {
-                            log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
+                            log.InfoFormat("GetText reported:  text: {0} - result:{1} and buffer size {2}", textBuff, (int)m.Result, (int)m.WParam);
                             lastcachedText = cachedText;
                         }
                     }
@@ -577,7 +619,7 @@ namespace SnapTestDocuments
                 }
 
                 log.InfoFormat("ExtSnapControl Current Selection begin:{0}, end:{1}", startPos, endPos);
-                lastselectionPair = new Tuple<int, int>(startPos, endPos);
+                lastSelectionPair = new Tuple<int, int>(startPos, endPos);
             }
         }
 
@@ -598,28 +640,70 @@ namespace SnapTestDocuments
                 }
                 if (Document.Fields?.Count > 0)
                 {
+                    var fieldRange = Document.Fields.ToList();
+                    fieldRange.Sort((field1, field2) => field1.ResultRange.Start.ToInt().CompareTo(field2.ResultRange.Start.ToInt()));
+                    var allEntities = new LinkedList<Field>(fieldRange);
+
                     var stringParts = new List<Tuple<string, int>>();
                     int initialRange = Document.Range.Start.ToInt();
-                    foreach (var fieldData in Document.Fields)
+                    var fieldData = allEntities.First;
+                    while(fieldData.Next != null)
                     {
-                        if (fieldData.Range.Start.ToInt() > initialRange)
+                        stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
+
+                        if (fieldData.Next.Value.Range.Start.ToInt() < fieldData.Value.ResultRange.End.ToInt())
                         {
-                            stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
-                            stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.ResultRange), 1));
-                            initialRange = fieldData.Range.End.ToInt();
+                            // text in field to nested field
+                            stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(fieldData.Value.ResultRange.Start.ToInt(),
+                                fieldData.Next.Value.ResultRange.Start.ToInt() - fieldData.Value.ResultRange.Start.ToInt())), 1));
+                            initialRange = fieldData.Next.Value.Range.Start.ToInt();
                         }
+                        else
+                        {
+                            // whole text in field
+                            stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.Value.ResultRange), 1));
+                            initialRange = fieldData.Value.Range.End.ToInt();
+                        }
+                        fieldData = fieldData.Next;
+                    }
+                    if (fieldData.Value.Range.Start.ToInt() > initialRange)
+                    {
+                        stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
+                        stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.Value.ResultRange), 1));
+                        initialRange = fieldData.Value.Range.End.ToInt();
                     }
                     stringParts.Add(new Tuple<string, int>((Document.GetText(Document.CreateRange(initialRange, Document.Range.End.ToInt() - initialRange))), 0));
-
                     dictationHelper.MapTextPositions(stringParts);
 
-                    
+                    if (Document.Fields?.Count > 0)
+                    {
+                        var stringPartsExt = new List<Tuple<string, int>>();
+                        int initialRangeExt = Document.Range.Start.ToInt();
+                        foreach (var fieldDataExt in Document.Fields)
+                        {
+                            if (fieldDataExt.Range.Start.ToInt() > initialRangeExt)
+                            {
+                                stringPartsExt.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRangeExt, fieldDataExt.Range.Start.ToInt() - initialRangeExt)), fieldDataExt.CodeRange.Length + 2));
+                                stringPartsExt.Add(new Tuple<string, int>(Document.GetText(fieldDataExt.ResultRange), 1));
+                                initialRangeExt = fieldDataExt.Range.End.ToInt();
+                            }
+                        }
+                        stringPartsExt.Add(new Tuple<string, int>((Document.GetText(Document.CreateRange(initialRangeExt, Document.Range.End.ToInt() - initialRangeExt))), 0));
+
+                        dictationHelper.MapTextPositions(stringPartsExt);
+
+                    }
+
                 }
-                else
+                    else
                 {
                     dictationHelper.MapTextPositions(cachedText);
                 }
                 log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
+
+
+
+                
             }
         }
 

@@ -340,6 +340,33 @@ namespace SnapTestDocuments
         }
     }
 
+
+    public class SimpleSnapContextImpl : ISnapCtrlContext
+    {
+        public DevExpress.Snap.SnapControl WorkControl { get; set; }
+        public SnapControlForm FormControl { get; set; }
+        SnapManagerContainer<ITextEditManager> manager = new SnapTestDocuments.SnapManagerContainer<ITextEditManager>();
+
+        public SnapControl SnapControl => WorkControl;
+
+        public SnapDocument SnapDocument => WorkControl.Document;
+
+        public SnapControlForm MainForm => FormControl;
+
+        public SnapDocument Document => WorkControl.Document;
+
+        public T GetManager<T>() where T : ITextEditManager
+        {
+            var managedItem = manager.Get<T>();
+            if (managedItem != null)
+            {
+                return managedItem;
+            }
+
+            return (T)(ITextEditManager)null;
+        }
+    }
+
     public class SnapContextImpl : ISnapCtrlContext
     {
         SnapManagerContainer<ITextEditManager> manager = new SnapTestDocuments.SnapManagerContainer<ITextEditManager>();

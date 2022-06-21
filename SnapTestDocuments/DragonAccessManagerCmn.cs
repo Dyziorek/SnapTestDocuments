@@ -4,8 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Threading;
 
 namespace SnapTestDocuments
 {
@@ -132,8 +130,10 @@ namespace SnapTestDocuments
                     bool lastParMark = false;
                     cacheStringText = SnapCtrl.Document.GetText(currentSectionField.Field.ToSnap().ResultRange);
                     var paragraphs = SnapCtrl.Document.Paragraphs.Get(currentSectionField.Field.ToSnap().ResultRange);
+                    var paragraphPositions = new List<int>();
                     foreach (var parItem in paragraphs)
                     {
+                        paragraphPositions.Add(parItem.Range.End.ToInt());
                         if (parItem.Range.End.ToInt() == currentSectionField.Field.ToSnap().ResultRange.End.ToInt())
                         {
                             lastParMark = true;
@@ -144,25 +144,85 @@ namespace SnapTestDocuments
                         cacheStringText += "\r\n";
                     }
                     var sectionRange = currentSectionField.Field.ToSnap().ResultRange;
-                    var allEntities = SnapFieldTools.GetFieldsInRange(SnapCtrl.Document, sectionRange);
-
+                    var fieldRange = SnapFieldTools.GetFieldsInRange(SnapCtrl.Document, sectionRange).ToList();
+                    fieldRange.Sort((field1, field2) => field1.ResultRange.Start.ToInt().CompareTo(field2.ResultRange.Start.ToInt()));
+                    var allEntities = new LinkedList<Field>(fieldRange);
                     if (allEntities.Count() > 0)
                     {
                         var stringParts = new List<Tuple<string, int>>();
                         int initialRange = sectionRange.Start.ToInt();
-                        foreach (var fieldData in allEntities)
+                        var fieldData = allEntities.First;
+                        while(fieldData.Next != null)
                         {
-                            if (fieldData.Range.Start.ToInt() >= initialRange)
+                            stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
+                            if (paragraphPositions.Exists( condition => condition == fieldData.Value.Range.Start.ToInt()))
                             {
-                                stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
-                                stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(fieldData.ResultRange), 1));
-                                initialRange = fieldData.Range.End.ToInt();
+                                var lastElement = stringParts.Last();
+                                stringParts[stringParts.Count - 1] = new Tuple<string, int>(lastElement.Item1 + "\r\n", lastElement.Item2);
                             }
+                            if (fieldData.Next.Value.Range.Start.ToInt() < fieldData.Value.ResultRange.End.ToInt())
+                            {
+                                // text in field to nested field
+                                stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(fieldData.Value.ResultRange.Start.ToInt(), 
+                                    fieldData.Next.Value.Range.Start.ToInt() - fieldData.Value.ResultRange.Start.ToInt())) , 0));
+                                initialRange = fieldData.Next.Value.Range.Start.ToInt();
+                            }
+                            else
+                            {
+                                // text in field
+                                stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(fieldData.Value.ResultRange), 1));
+                                initialRange = fieldData.Value.Range.End.ToInt();
+                            }
+                            fieldData = fieldData.Next;
                         }
-                        stringParts.Add(new Tuple<string, int>((SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, sectionRange.End.ToInt() - initialRange))), 0));
+                        if (fieldData.Value.Range.Start.ToInt() >= initialRange)
+                        {
+                            stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
+                            if (paragraphPositions.Exists(condition => condition == fieldData.Value.Range.Start.ToInt()))
+                            {
+                                var lastElement = stringParts.Last();
+                                stringParts[stringParts.Count - 1] = new Tuple<string, int>(lastElement.Item1 + "\r\n", lastElement.Item2);
+                            }
+                            stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(fieldData.Value.ResultRange), 1));  
+                            initialRange = fieldData.Value.Range.End.ToInt();
+                        }
+                        var fieldinRange = allEntities.Where(checker => checker.ResultRange.Start.ToInt() <= initialRange && checker.ResultRange.End.ToInt() >= initialRange);
+                        if (fieldinRange.Count() == 1)
+                        {
+                            var lastPartRange = SnapCtrl.Document.CreateRange(initialRange, fieldinRange.First().ResultRange.End.ToInt() - initialRange);
+                            string partialTexts = SnapCtrl.Document.GetText(lastPartRange);
+                            stringParts.Add(new Tuple<string, int>(partialTexts, 1));
+                            lastPartRange = SnapCtrl.Document.CreateRange(fieldinRange.First().Range.End.ToInt(), sectionRange.End.ToInt() - fieldinRange.First().Range.End.ToInt());
+                            partialTexts = SnapCtrl.Document.GetText(lastPartRange);
+                            stringParts.Add(new Tuple<string, int>(partialTexts, 0));
+                        }
+                        else
+                        {
+                            var lastPartRange = SnapCtrl.Document.CreateRange(initialRange, sectionRange.End.ToInt() - initialRange);
+                            stringParts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(lastPartRange), 0));
+                        }
                         dictationHelper.MapTextPositions(stringParts);
                         textMapped = true;
-                        ShowMappingTexts();
+
+                        //var allEntitiesExt = SnapFieldTools.GetFieldsInRange(SnapCtrl.Document, sectionRange);
+                        //if (allEntitiesExt.Count() > 0)
+                        //{
+                        //    var strTexts = new List<Tuple<string, int>>();
+                        //    initialRange = sectionRange.Start.ToInt();
+                        //    foreach (var fieldDataExt in allEntitiesExt)
+                        //    {
+                        //        if (fieldDataExt.Range.Start.ToInt() >= initialRange)
+                        //        {
+                        //            strTexts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, fieldDataExt.Range.Start.ToInt() - initialRange)), fieldDataExt.CodeRange.Length + 2));
+                        //            strTexts.Add(new Tuple<string, int>(SnapCtrl.Document.GetText(fieldDataExt.ResultRange), 1));
+                        //            initialRange = fieldDataExt.Range.End.ToInt();
+                        //        }
+                        //    }
+                        //    strTexts.Add(new Tuple<string, int>((SnapCtrl.Document.GetText(SnapCtrl.Document.CreateRange(initialRange, sectionRange.End.ToInt() - initialRange))), 0));
+                        //    //dictationHelper.MapTextPositions(strTexts);
+                        //    textMapped = true;
+                        //}
+
                     }
                 }
                 else

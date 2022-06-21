@@ -32,7 +32,7 @@ namespace SnapTestDocuments
             log4net.Config.XmlConfigurator.Configure(new FileInfo(string.Format("{0}.config", @"C:\Users\ddus\source\repos\SnapTestDocuments\SnapTestDocuments\bin\Deploy\log4net")));
             //string fx = "The quick brown fox jumps over lazy";
             //string fxc = "The brown fox jumps over lazy";
-
+            snapControl2.SetContext = new SimpleSnapContextImpl();
             //DiffMatchPatchText matchPatchText = new DiffMatchPatchText();
             //var differ = matchPatchText.diff_main(fx, fxc);
             //var deltat = matchPatchText.diff_toDelta(differ);
