@@ -50,7 +50,8 @@ namespace SnapTestDocuments
         EditField,
         CannedMessage,
         InterpretationSection,
-        EmptySection
+        EmptySection,
+        UDxSection
     }
 
     public class DocumentEntityBase

@@ -37,8 +37,8 @@ namespace SnapTestDocuments
             //var differ = matchPatchText.diff_main(fx, fxc);
             //var deltat = matchPatchText.diff_toDelta(differ);
             //System.Diagnostics.Debug.WriteLine(deltat);
-
-
+            var rootData = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
+            button1.Text = "Log (" + rootData.Level.Name + ")";
         }
 
 
@@ -255,6 +255,23 @@ namespace SnapTestDocuments
                     check.Flush();
                 }
             }
+        }
+
+        private void buttonLog_Click(object sender, EventArgs e)
+        {
+            var rootData = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
+
+            if (rootData.Level == log4net.Core.Level.Debug)
+            {
+                rootData.Level = log4net.Core.Level.Info;
+            }
+            else
+            {
+                rootData.Level = log4net.Core.Level.Debug;
+            }
+
+            ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
+            button1.Text = "Log (" + rootData.Level.Name + ")";
         }
     }
 }

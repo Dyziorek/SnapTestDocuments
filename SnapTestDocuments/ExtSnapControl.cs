@@ -50,7 +50,7 @@ namespace SnapTestDocuments
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
         public struct tagChar
         {
-            char charVal;
+            char charVal;       //parasoft-suppress CMUG.FU.AUPF "Used only for calculate size of type"
         }
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
@@ -129,7 +129,7 @@ namespace SnapTestDocuments
 
                 if (lastSelectionPair != requestSelectPair && requestSelectPair.Item1 == requestSelectPair.Item2)
                 {
-                    caretPos = Document.CreateRange(requestSelectPair.Item1, Math.Abs(requestSelectPair.Item2 - requestSelectPair.Item1));
+                    caretPos = Document.CreateRange(lastSelectionPair.Item1, Math.Abs(lastSelectionPair.Item2 - lastSelectionPair.Item1));
                 }
                 string textToReplace = cachedText;
                 if (caretPos.End.ToInt() <= cachedText.Length)
@@ -188,7 +188,8 @@ namespace SnapTestDocuments
                 if (maxPos == minPos)
                 {
                     bool adjustedField = false;
-                    if (adjustField.Item1 && adjustField.Item2 != null)
+                    
+                    if (adjustField.Item1 && adjustField.Item2 != null && true == (adjustField.Item2 as DevExpress.XtraRichEdit.API.Native.Implementation.NativeField)?.IsValid)
                     {
                         var cursorPos = dictationHelper.SnapToEdit(minPos);
                         var fieldEndPos = dictationHelper.SnapToEdit(adjustField.Item2.Range.End.ToInt());
@@ -203,19 +204,14 @@ namespace SnapTestDocuments
                     {
                         Document.BeginUpdate();
                         var docCharPos = Document.CreatePosition(minPos);
-                        var rectObj = GetLayoutPhysicalBoundsFromPosition(docCharPos);
-                        var viewBounds = ViewBounds;
-                        viewBounds.Inflate((int)Math.Floor(-viewBounds.Width * 0.05f), (int)Math.Floor(-viewBounds.Height * 0.05f));
-                        rectObj.Offset(viewBounds.X, viewBounds.Y);
+                        var rectObj = GetBoundsFromPosition(docCharPos);
+                        rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
                         Document.CaretPosition = docCharPos;
-                        log.InfoFormat("Client Rect : {0} View Rect: {1}", ClientRectangle, ViewBounds);
-                        if (rectObj == Rectangle.Empty || !viewBounds.Contains(rectObj.Left, rectObj.Top) || !viewBounds.Contains(rectObj.Right, rectObj.Bottom))
+                        if (rectObj == System.Drawing.Rectangle.Empty || !ClientRectangle.Contains(rectObj.X, rectObj.Y))
                         {
-                            ScrollToCaret(0.3f);
+                            ScrollToCaret();
                         }
                         Document.EndUpdate();
-
-                        //Document.CaretPosition = Document.CreatePosition(minPos);
                     }
                 }
                 else
@@ -224,16 +220,12 @@ namespace SnapTestDocuments
                     {
                         Document.BeginUpdate();
                         var docCharPos = Document.CreatePosition(minPos);
-                        var rectObj = GetLayoutPhysicalBoundsFromPosition(docCharPos);
-                        var viewBounds = ViewBounds;
-                        viewBounds.Inflate((int)Math.Floor(-viewBounds.Width * 0.05f), (int)Math.Floor(-viewBounds.Height * 0.05f));
-                        rectObj.Offset(viewBounds.X, viewBounds.Y);
-                        Document.CaretPosition = docCharPos;
-                        log.InfoFormat("Client Rect : {0} View Rect: {1}", ClientRectangle, ViewBounds);
-                        if (rectObj == Rectangle.Empty || !viewBounds.Contains(rectObj.Left, rectObj.Top) || !viewBounds.Contains(rectObj.Right, rectObj.Bottom))
+                        var rectObj = GetBoundsFromPosition(docCharPos);
+                        rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
+                        if (rectObj == System.Drawing.Rectangle.Empty || !ClientRectangle.Contains(rectObj.X, rectObj.Y))
                         {
                             Document.CaretPosition = docCharPos;
-                            ScrollToCaret(0.3f);
+                            ScrollToCaret();
                         }
                         Document.Selection = Document.CreateRange(minPos, maxPos - minPos);
                         Document.EndUpdate();
@@ -250,7 +242,7 @@ namespace SnapTestDocuments
         {
             switch (m.Msg)
             {
-                case 194:  // EM_REPLACESEL,  replace text in place of current selection given in pair lastselectionPair, also if no selection simply dictates new text.
+                case 194:  // EM_REPLACESEL,  replace text in place of current selection given in pair lastSelectionPair, also if no selection simply dictates new text.
                     if (log.IsInfoEnabled)
                     {
                         log.Info(string.Format("Replace selected text: '{0}', Undo: {1}", Marshal.PtrToStringAuto(m.LParam), (int)m.WParam));
@@ -295,7 +287,7 @@ namespace SnapTestDocuments
                         {
                             lastCaretPos = new Tuple<int, int>(lastCaretPos.Item1, 65535 - lastCaretPos.Item1);
                         }
-                        Int32 retVal = Convert.ToInt16(lastCaretPos.Item1) + (Convert.ToInt16(lastCaretPos.Item2) << 16);
+                        Int32 retVal = lastCaretPos.Item1 & 0xffff | ((lastCaretPos.Item2 & 0xffff) << 16);
                         m.Result = (IntPtr)retVal;
                         log.InfoFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt32(m.WParam), Marshal.ReadInt32(m.LParam), (int)m.Result);
                     }
@@ -392,7 +384,7 @@ namespace SnapTestDocuments
                         }
                         if (!string.Equals(lastcachedText, cachedText))
                         {
-                            log.InfoFormat("GetText reported:  text: {0} - result:{1} and buffer size {2}", textBuff, (int)m.Result, (int)m.WParam);
+                            log.InfoFormat("GetText reported:  text: {0} - result:{1}", textBuff, (int)m.Result);
                             lastcachedText = cachedText;
                         }
                     }
@@ -565,6 +557,13 @@ namespace SnapTestDocuments
                         }
                     }
                     break;
+                case 0x0102: //WM_CHAR
+                    if ((int)m.WParam == 0x0D) //VK_RETURN
+                    {
+                        return;
+                    }
+                    base.WndProc(ref m);
+                    break;
                 default:
                     log.Debug("Base Message processed: " + m.ToString());
                     base.WndProc(ref m);
@@ -640,62 +639,35 @@ namespace SnapTestDocuments
                 }
                 if (Document.Fields?.Count > 0)
                 {
-                    var fieldRange = Document.Fields.ToList();
-                    fieldRange.Sort((field1, field2) => field1.ResultRange.Start.ToInt().CompareTo(field2.ResultRange.Start.ToInt()));
-                    var allEntities = new LinkedList<Field>(fieldRange);
+                    //var paragraphs = Document.Paragraphs;
+                    //var paragraphPositions = new List<int>();
+                    //foreach (var parItem in paragraphs)
+                    //{
+                    //    paragraphPositions.Add(parItem.Range.End.ToInt());
+                    //}
 
-                    var stringParts = new List<Tuple<string, int>>();
-                    int initialRange = Document.Range.Start.ToInt();
-                    var fieldData = allEntities.First;
-                    while(fieldData.Next != null)
+                    //var stringParts = new List<Tuple<string, int>>();
+                    //int initialRange = Document.Range.Start.ToInt();
+                    //foreach (var fieldData in Document.Fields)
+                    //{
+                    //    if (fieldData.Range.Start.ToInt() > initialRange)
+                    //    {
+                    //        stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
+                    //        stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.ResultRange), 1));
+                    //        initialRange = fieldData.Range.End.ToInt();
+                    //    }
+                    //}
+                    //stringParts.Add(new Tuple<string, int>((Document.GetText(Document.CreateRange(initialRange, Document.Range.End.ToInt() - initialRange))), 0));
+                    //dictationHelper.MapTextPositions(stringParts, paragraphPositions);
+                    var paragraphs = Document.Paragraphs.Get(Document.Range);
+                    var paragraphPositions = new List<int>();
+                    foreach (var parItem in paragraphs)
                     {
-                        stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
-
-                        if (fieldData.Next.Value.Range.Start.ToInt() < fieldData.Value.ResultRange.End.ToInt())
-                        {
-                            // text in field to nested field
-                            stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(fieldData.Value.ResultRange.Start.ToInt(),
-                                fieldData.Next.Value.ResultRange.Start.ToInt() - fieldData.Value.ResultRange.Start.ToInt())), 1));
-                            initialRange = fieldData.Next.Value.Range.Start.ToInt();
-                        }
-                        else
-                        {
-                            // whole text in field
-                            stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.Value.ResultRange), 1));
-                            initialRange = fieldData.Value.Range.End.ToInt();
-                        }
-                        fieldData = fieldData.Next;
+                        paragraphPositions.Add(parItem.Range.End.ToInt());
                     }
-                    if (fieldData.Value.Range.Start.ToInt() > initialRange)
-                    {
-                        stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
-                        stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.Value.ResultRange), 1));
-                        initialRange = fieldData.Value.Range.End.ToInt();
-                    }
-                    stringParts.Add(new Tuple<string, int>((Document.GetText(Document.CreateRange(initialRange, Document.Range.End.ToInt() - initialRange))), 0));
-                    dictationHelper.MapTextPositions(stringParts);
-
-                    if (Document.Fields?.Count > 0)
-                    {
-                        var stringPartsExt = new List<Tuple<string, int>>();
-                        int initialRangeExt = Document.Range.Start.ToInt();
-                        foreach (var fieldDataExt in Document.Fields)
-                        {
-                            if (fieldDataExt.Range.Start.ToInt() > initialRangeExt)
-                            {
-                                stringPartsExt.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRangeExt, fieldDataExt.Range.Start.ToInt() - initialRangeExt)), fieldDataExt.CodeRange.Length + 2));
-                                stringPartsExt.Add(new Tuple<string, int>(Document.GetText(fieldDataExt.ResultRange), 1));
-                                initialRangeExt = fieldDataExt.Range.End.ToInt();
-                            }
-                        }
-                        stringPartsExt.Add(new Tuple<string, int>((Document.GetText(Document.CreateRange(initialRangeExt, Document.Range.End.ToInt() - initialRangeExt))), 0));
-
-                        dictationHelper.MapTextPositions(stringPartsExt);
-
-                    }
-
+                    dictationHelper.AnalyzeTextSection(this, Document.Range, paragraphPositions);
                 }
-                    else
+                else
                 {
                     dictationHelper.MapTextPositions(cachedText);
                 }
