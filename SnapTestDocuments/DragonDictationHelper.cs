@@ -42,7 +42,7 @@ namespace SnapTestDocuments
     }
 
 
-    public static class DragonDicationTools
+    public static class DragonDictationTools
     {
         public static bool IsNotNullSelection(this Tuple<int, int> firstOperand)
         {
@@ -65,24 +65,98 @@ namespace SnapTestDocuments
             }
         }
 
-        public static void ArrangeFields(this List<FieldTreeNode> baseFields, FieldLinkedList fields)
+        public static void ArrangeFields(this List<FieldTreeNode> baseFields, FieldLinkedList fields, SnapControl control)
         {
             var fieldElem = fields.First;
-            baseFields.Add(new FieldTreeNode(fieldElem.Value));
+
+            string fieldCode = VerifyField(fieldElem.Value, control);
+            baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCode, control.Document.GetText(fieldElem.Value.ResultRange )));
             while (fieldElem.Next != null)
             {
                 fieldElem = fieldElem.Next;
-                if(fieldElem.Value.Parent != null)
+                if (fieldElem.Value.Parent != null)
                 {
-                    var found = baseFields.Find(cheker => cheker.Data.Range.Start == fieldElem.Value.Parent.Range.Start && cheker.Data.Range.End == fieldElem.Value.Parent.Range.End);
-                    if (found != null)
-                        found.AddChildren(fieldElem);
+                    bool found = false;
+                    foreach(FieldTreeNode node in baseFields)
+                    {
+                        if (node.Data.Range.Start == fieldElem.Value.Parent.Range.Start && node.Data.Range.End == fieldElem.Value.Parent.Range.End)
+                        {
+                            node.AddChild(fieldElem, control);
+                            found = true;
+                        }
+                        else
+                        {
+                            var childNode = node.AllChildren.FirstOrDefault(check => check.Data.Range.Start == fieldElem.Value.Parent.Range.Start && check.Data.Range.End == fieldElem.Value.Parent.Range.End);
+                            if (childNode != null)
+                            {
+                                childNode.AddChild(fieldElem, control);
+                                found = true;
+                            }
+                         }
+                    }
+
+                    
+                    if (!found)
+                    {
+                        string fieldCodeChild = VerifyField(fieldElem.Value, control);
+                        if (fieldCodeChild != null)
+                        {
+                            baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCodeChild, control.Document.GetText(fieldElem.Value.ResultRange)));
+                        }
+                        else
+                        {
+                            baseFields.Add(new FieldTreeNode(fieldElem.Value, "GetTextCall:" + control.Document.GetText(fieldElem.Value.CodeRange), control.Document.GetText(fieldElem.Value.ResultRange)));
+                        }
+                    }
                 }
                 else
                 {
-                    baseFields.Add(new FieldTreeNode(fieldElem.Value));
+                    string fieldCodeChild = VerifyField(fieldElem.Value, control);
+                    if (fieldCodeChild != null)
+                    {
+                        baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCodeChild, control.Document.GetText(fieldElem.Value.ResultRange)));
+                    }
+                    else
+                    {
+                        baseFields.Add(new FieldTreeNode(fieldElem.Value, "GetTextCall:" + control.Document.GetText(fieldElem.Value.CodeRange), control.Document.GetText(fieldElem.Value.ResultRange)));
+                    }
+
                 }
             }
+        }
+
+        public static string VerifyField(Field value, SnapControl control)
+        {
+            var fld = control.Document.ParseField(value);
+            if (fld is DevExpress.Snap.API.Native.NativeSnapList lst)
+            {
+                return "SnapList:" + lst.Name;
+            }
+            if (fld is DevExpress.Snap.API.Native.NativeSnapListFilters flt)
+            {
+                return "SnapLisFilter:";
+            }
+            if (fld is DevExpress.Snap.API.Native.NativeSnapRowIndex row)
+            {
+                return "SnapRowIndx:" + row.FormatString;
+            }
+            if (fld is DevExpress.Snap.API.Native.NativeSnapSection sct)
+            {
+                return "SnapSection:";
+            }
+            if (fld is DevExpress.Snap.API.Native.NativeSnapText txt)
+            {
+                return "FieldText:" + txt.DataFieldName;
+            }
+            if (fld is DevExpress.Snap.API.Native.NativeSnapSingleListItemEntity se)
+            {
+                return "SingleList:" + se.DataFieldName;
+            }
+            if (fld is DevExpress.Snap.API.Native.NativeSnapEntityBase oth)
+            {
+                return "FieldBase:" + oth.ToString();
+            }
+            return "Unknown field";
         }
 
         //public static int WholeCount(this List<FieldTreeNode> fieldTrees)
@@ -176,7 +250,7 @@ namespace SnapTestDocuments
             if (allEntities.Count() > 0)
             {
                 // document contains edit fields
-                fieldNodes.ArrangeFields(allEntities);
+                fieldNodes.ArrangeFields(allEntities, control);
                 var stringParts = new List<Tuple<string, int>>();
                 int initialRange = sectionRange.Start.ToInt();
                 var fieldData = allEntities.First;
@@ -257,7 +331,7 @@ namespace SnapTestDocuments
             if (fieldRange.Count() > 0)
             {
                 // document contains edit fields
-                fieldNodes.ArrangeFields(new FieldLinkedList(fieldRange));
+                fieldNodes.ArrangeFields(new FieldLinkedList(fieldRange), control);
                 var stringParts = new List<Tuple<string, int>>();
                 int initialRange = sectionRange.Start.ToInt();
                 foreach (var fieldElement in fieldNodes)

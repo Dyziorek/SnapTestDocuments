@@ -1,4 +1,5 @@
-﻿using DevExpress.XtraRichEdit.API.Native;
+﻿using DevExpress.Snap;
+using DevExpress.XtraRichEdit.API.Native;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -12,6 +13,9 @@ namespace SnapTestDocuments
     {
 
         public Field Data { get; set; }
+        public string FieldCode;
+
+        public string FieldTextValue;
         public FieldTreeNode Parent { get; set; }
         private readonly LinkedList<FieldTreeNode> children;
         public ICollection<FieldTreeNode> Children => children;
@@ -44,18 +48,36 @@ namespace SnapTestDocuments
             }
         }
 
-        public FieldTreeNode(Field data)
+        public ICollection<FieldTreeNode> AllChildren { 
+            get
+            {
+                LinkedList<FieldTreeNode> fieldTreeNodes = new LinkedList<FieldTreeNode>();
+                foreach(var child in Children)
+                {
+                    fieldTreeNodes.AddLast(child);
+                    foreach (var subChild in child.AllChildren)
+                    {
+                        fieldTreeNodes.AddLast(subChild);
+                    }
+                }
+                return fieldTreeNodes;
+            } 
+        }
+
+        public FieldTreeNode(Field data, string fieldCode, string textField)
         {
             this.Data = data;
+            this.FieldCode = fieldCode;
+            this.FieldTextValue = textField;
             this.children = new LinkedList<FieldTreeNode>();
 
             //this.ElementsIndex = new LinkedList<FieldTreeNode>();
             //this.ElementsIndex.Add(this);
         }
 
-        public FieldTreeNode AddChild(Field child)
+        public FieldTreeNode AddChild(Field child, string fieldCode, string textField)
         {
-            FieldTreeNode childNode = new FieldTreeNode(child) { Parent = this };
+            FieldTreeNode childNode = new FieldTreeNode(child, fieldCode, textField) { Parent = this };
             this.Children.Add(childNode);
 
             //this.RegisterChildForSearch(childNode);
@@ -63,20 +85,10 @@ namespace SnapTestDocuments
             return childNode;
         }
 
-        public void AddChildren(LinkedListNode<Field> indexer)
+        public void AddChild(LinkedListNode<Field> indexer, SnapControl control)
         {
-            var childNode = AddChild(indexer.Value);
-            if (indexer.Next != null)
-            {
-                if (childNode.Data.ResultRange.End.ToInt() > indexer.Next.Value.ResultRange.End.ToInt())
-                {
-                    childNode.AddChildren(indexer.Next);
-                }
-                //else if (Data.ResultRange.End.ToInt() > indexer.Next.Value.ResultRange.End.ToInt())
-                //{
-                //    AddChildren(indexer.Next);
-                //}
-            }
+            string fieldCodeChild = DragonDictationTools.VerifyField(indexer.Value, control);
+            AddChild(indexer.Value, fieldCodeChild, control.Document.GetText(indexer.Value.ResultRange));
         }
 
         public override string ToString()
@@ -86,6 +98,7 @@ namespace SnapTestDocuments
                 StringBuilder fullPack = new StringBuilder();
                 fullPack.Append("(").AppendLine();
                 fullPack.Append(Data != null ? "(" + Data.Range.Start.ToString() + ", " + Data.Range.End.ToString() + ")" + "{" + Data.ResultRange.Start.ToString() + ", " + Data.ResultRange.End.ToString() + "}" : "[data null]");
+                fullPack.Append(",FC:").Append(FieldCode).Append(",FV:").Append(FieldTextValue);
                 foreach(var child in Children)
                 {
                     fullPack.AppendLine();
@@ -97,7 +110,11 @@ namespace SnapTestDocuments
             }
             else
             {
-                return Data != null ? "(" + Data.Range.Start.ToString() + ", " + Data.Range.End.ToString() + ")" + "{" + Data.ResultRange.Start.ToString() + ", " + Data.ResultRange.End.ToString() + "}" : "[data null]";
+
+                StringBuilder fullPack = new StringBuilder();
+                fullPack.Append(Data != null ? "(" + Data.Range.Start.ToString() + ", " + Data.Range.End.ToString() + ")" + "{" + Data.ResultRange.Start.ToString() + ", " + Data.ResultRange.End.ToString() + "}" : "[data null]");
+                fullPack.Append(",FC:").Append(FieldCode).Append(",FV:").Append(FieldTextValue);
+                return fullPack.ToString();
             }
         }
 
