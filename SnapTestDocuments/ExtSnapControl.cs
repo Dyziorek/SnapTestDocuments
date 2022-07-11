@@ -289,7 +289,7 @@ namespace SnapTestDocuments
                         }
                         Int32 retVal = lastCaretPos.Item1 & 0xffff | ((lastCaretPos.Item2 & 0xffff) << 16);
                         m.Result = (IntPtr)retVal;
-                        log.InfoFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt32(m.WParam), Marshal.ReadInt32(m.LParam), (int)m.Result);
+                        log.DebugFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt32(m.WParam), Marshal.ReadInt32(m.LParam), (int)m.Result);
                     }
                     break;
                 case 177: // EM_SETSEL - sets Selection marker by positions provided in m.Wparam i m.LParam - store previous selection, 
@@ -348,7 +348,7 @@ namespace SnapTestDocuments
                             Marshal.FreeHGlobal(oldRectPtr);
                         }
                         oldRectPtr = pnt;
-                        log.InfoFormat("GetRect: x:{0}, y:{1}, w:{2} ,h:{3}", winRect.Left, winRect.Top, winRect.Bottom, winRect.Right);
+                        log.DebugFormat("GetRect: x:{0}, y:{1}, w:{2} ,h:{3}", winRect.Left, winRect.Top, winRect.Bottom, winRect.Right);
                     }
                     break;
                 case 13: // WM_GETTEXT - 
@@ -422,9 +422,9 @@ namespace SnapTestDocuments
                         if (_currentContext?.GetManager<IDragonAccessManager>() != null)
                         {
                             rectObj = _currentContext.GetManager<IDragonAccessManager>().PosFromChar((int)m.WParam);
-                            if (log.IsInfoEnabled)
+                            if (log.IsDebugEnabled)
                             {
-                                log.InfoFormat("Position  C:{0},mapped:{4},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result, dictationHelper.EditToSnap((int)m.WParam));
+                                log.DebugFormat("Position  C:{0},mapped:{4},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result, dictationHelper.EditToSnap((int)m.WParam));
                             }
                             if (rectObj.IsEmpty)
                             {
@@ -494,9 +494,9 @@ namespace SnapTestDocuments
                     if (textBuff != null)
                     {
                         m.Result = (IntPtr)DragonDictationHelper.getLineFromText(textBuff, position);
-                        if (log.IsInfoEnabled)
+                        if (log.IsDebugEnabled)
                         {
-                            log.InfoFormat("Line Pos from Point  C:{0},Line:{1}", position, (int)m.Result);
+                            log.DebugFormat("Line Pos from Point  C:{0},Line:{1}", position, (int)m.Result);
                         }
                     }
                     break;
@@ -665,7 +665,7 @@ namespace SnapTestDocuments
                     {
                         paragraphPositions.Add(parItem.Range.End.ToInt());
                     }
-                    dictationHelper.AnalyzeTextSection(this, Document.Range, paragraphPositions);
+                    dictationHelper.AnalyzeTextSection(this, Document.Range, cachedText, paragraphPositions);
                 }
                 else
                 {

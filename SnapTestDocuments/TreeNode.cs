@@ -48,6 +48,14 @@ namespace SnapTestDocuments
             }
         }
 
+        public FieldTreeNode LastChild
+        {
+            get
+            {
+                return children.Count > 0 ? children.Last.Value : null;
+            }
+        }
+
         public ICollection<FieldTreeNode> AllChildren { 
             get
             {

@@ -183,6 +183,7 @@ namespace SnapTestDocuments
         /// </summary>
         private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
         private ITextEditWinFormsUIContext _snapCtrlContext;
+        private string textEditImage;
 
 
         protected IEmptyMergeFieldCharacterPropertiesManager EmptyMergeFieldCharacterPropertiesMgr { get { return _snapCtrlContext.GetManager<IEmptyMergeFieldCharacterPropertiesManager>(); } }
@@ -243,9 +244,13 @@ namespace SnapTestDocuments
              var sectionRange = sectionPart;
             var fieldRange = SnapFieldTools.GetFieldsInRange(control.Document, sectionRange).ToList();
             var paragraphPositions = paragraphsCollection.ToList();
+
+            var ll = paragraphPositions.Select(Call => new Tuple<int, int>(Call, Call));
             fieldRange.Sort((field1, field2) => field1.ResultRange.Start.ToInt().CompareTo(field2.ResultRange.Start.ToInt()));
             List<FieldTreeNode> fieldNodes = new List<FieldTreeNode>();
             
+
+
             var allEntities = new FieldLinkedList(fieldRange);
             if (allEntities.Count() > 0)
             {
@@ -313,14 +318,14 @@ namespace SnapTestDocuments
                         log.InfoFormat("Part {0} Elements '{1}' , {2}", index, stringParts[index].Item1, stringParts[index].Item2);
                     }
                 }
-                MapTextPositions(stringParts, paragraphPositions);
+                MapTextPositions(stringParts, paragraphPositions, "",  control, sectionPart.Start.ToInt());
                 return true;
             }
             return false;
         }
 
 
-        public bool AnalyzeTextSection(SnapControl control, DocumentRange sectionPart, IEnumerable<int> paragraphsCollection)
+        public bool AnalyzeTextSection(SnapControl control, DocumentRange sectionPart, string sectionText,  IEnumerable<int> paragraphsCollection)
         {
             var sectionRange = sectionPart;
             var fieldRange = SnapFieldTools.GetFieldsInRange(control.Document, sectionRange).ToList();
@@ -357,7 +362,7 @@ namespace SnapTestDocuments
                         {
                             // text before field with nested children
                             stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
-                            initialRange = fieldData.Range.Start.ToInt();
+                            initialRange = fieldData.Range.Start.ToInt() + 1;
                             AnalyzeNestedFields(control, fieldElement, ref initialRange, stringParts);
                             initialRange = fieldData.Range.End.ToInt();
                         }
@@ -374,7 +379,7 @@ namespace SnapTestDocuments
                     }
                 }
 
-                MapTextPositions(stringParts, paragraphPositions);
+                MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
 
                 return true;
             }
@@ -386,9 +391,10 @@ namespace SnapTestDocuments
             // first check if current field has resultRange text before first nested field
             if (fieldElement.Data.ResultRange.Start < fieldElement.FirstChild.Data.ResultRange.Start)
             {
-                stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
-                            fieldElement.FirstChild.Data.ResultRange.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), 0));
-                initialRange = fieldElement.FirstChild.Data.ResultRange.Start.ToInt();
+
+                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
+                                fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), 0));
+                initialRange = fieldElement.FirstChild.Data.Range.Start.ToInt();
             }
 
             foreach (var childItem in fieldElement.Children)
@@ -400,10 +406,17 @@ namespace SnapTestDocuments
                 else
                 {
                     var currentChild = childItem.Data;
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, currentChild.ResultRange.Start.ToInt() - initialRange)), 0));
+                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, currentChild.Range.Start.ToInt() - initialRange)), currentChild.CodeRange.Length + 2));
                     stringParts.Add(new Tuple<string, int>(control.Document.GetText(currentChild.ResultRange), 1));
                     initialRange = currentChild.Range.End.ToInt();
                 }
+            }
+
+            if (fieldElement.Data.ResultRange.End > fieldElement.LastChild.Data.ResultRange.End)
+            {
+                stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.LastChild.Data.Range.End.ToInt(),
+                            fieldElement.Data.ResultRange.End.ToInt() - fieldElement.LastChild.Data.Range.End.ToInt())), 1));
+                initialRange = fieldElement.Data.Range.End.ToInt();
             }
         }
 
@@ -428,7 +441,7 @@ namespace SnapTestDocuments
         /// for postion 9 returns 9 but for position 15 returns 14.</para>
         /// </summary>
         /// <param name="textSection">Text content on which Dragon dication is working</param>
-        public Tuple<Dictionary<int, int>, Dictionary<int, int>> MapTextPositions(string textSection, bool append = false, IEnumerable<int> sectionParagraphs = null)
+        public Tuple<Dictionary<int, int>, Dictionary<int, int>> MapTextPositions(string textSection, bool append = false, IEnumerable<int> sectionParagraphs = null )
         {
             var dictEditPosData = new Dictionary<int, int>();
             var dictSnapPosData = new Dictionary<int, int>();
@@ -448,13 +461,10 @@ namespace SnapTestDocuments
                     }
                     if (!append || indexLine != lineparts.Length - 1)
                     {
-                        if (sectionParagraphs != null)
+                        if (sectionParagraphs != null && sectionParagraphs.Contains(lineText.Length + sumTextEdit + 1))
                         {
-                            if (sectionParagraphs.Contains(lineText.Length + sumTextEdit))
-                            {
-                                dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length + sumTextSnap;
-                                dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
-                            }
+                            dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length  + sumTextSnap;
+                            dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
                         }
                         else
                         {
@@ -505,15 +515,32 @@ namespace SnapTestDocuments
             return new Tuple<Dictionary<int, int>, Dictionary<int, int>>(dictEditPosData, dictSnapPosData);
         }
 
-        public void MapTextPositions(List<Tuple<string, int>> textSections, IEnumerable<int> sectionParagraphs)
+        public void MapTextPositions(List<Tuple<string, int>> textSections, IEnumerable<int> sectionParagraphs, string texControl, SnapControl control, int sectionOffset)
         {
             int snapTextOffset = 0;
             int editTextOffset = 0;
+            int fieldOffsets = 0;
             var dictEditToSnapPosData = new Dictionary<int, int>();
             var dictSnapToEditPosData = new Dictionary<int, int>();
-            foreach (var tuples in textSections)
+            for(int index = 0; index < textSections.Count; index++)
             {
-                var mapping = MapTextPositions(tuples.Item1, true, sectionParagraphs);
+                var sectionOffseted = sectionParagraphs.Select(sectionOffsetPart => sectionOffsetPart -= fieldOffsets).ToList();
+                if (textSections[index].Item2 > 0)
+                {
+                    fieldOffsets += textSections[index].Item2;
+                }
+                var strTextPart = textSections[index].Item1;
+                if (sectionOffseted.Contains(strTextPart.Length + 1))
+                {
+                    strTextPart += "\r\n";
+                    textSections[index] = new Tuple<string, int>(strTextPart, textSections[index].Item2);
+                }
+            }
+
+
+            foreach (var sectionTextPart in textSections)
+            {
+                var mapping = MapTextPositions(sectionTextPart.Item1, true, null);
                 foreach (var mapEdits in mapping.Item1)
                 {
                     dictEditToSnapPosData[mapEdits.Key + editTextOffset] = mapEdits.Value + snapTextOffset;
@@ -522,16 +549,16 @@ namespace SnapTestDocuments
                 {
                     dictSnapToEditPosData[mapEdits.Key + snapTextOffset] = mapEdits.Value + editTextOffset;
                 }
-                if (tuples.Item2 > 0 && !String.IsNullOrEmpty(tuples.Item1) && dictSnapToEditPosData.Count > 0)                                               // TODO : review this code because make errors???
+                if (sectionTextPart.Item2 > 0 && !String.IsNullOrEmpty(sectionTextPart.Item1) && dictSnapToEditPosData.Count > 0)                                               // TODO : review this code because make errors???
                 {
                     int editValue = dictSnapToEditPosData.Max(cmp => cmp.Value) + 1;
                     int snapValue = dictSnapToEditPosData.Max(cmp => cmp.Key) + 1;
-                    for (int index = 0; index < tuples.Item2; index++)
+                    for (int index = 0; index < sectionTextPart.Item2; index++)
                     {
                         dictSnapToEditPosData[snapValue + index] = editValue;
                     }
                 }
-                else if (tuples.Item2 > 0)
+                else if (sectionTextPart.Item2 > 0)
                 {
                     int editValue = 1;
                     int snapValue = 1;
@@ -540,7 +567,7 @@ namespace SnapTestDocuments
                         editValue = dictSnapToEditPosData.Max(cmp => cmp.Value) + 1;
                         snapValue = dictSnapToEditPosData.Max(cmp => cmp.Key) + 1;
                     }
-                    for (int index = 0; index < tuples.Item2; index++)
+                    for (int index = 0; index < sectionTextPart.Item2; index++)
                     {
                         dictSnapToEditPosData[snapValue + index] = editValue;
                     }
@@ -548,16 +575,17 @@ namespace SnapTestDocuments
                 if (mapping.Item1.Count > 0)
                 {
                     editTextOffset = editTextOffset + mapping.Item1.Max(cmp => cmp.Key) + 1;
-                    snapTextOffset = snapTextOffset + mapping.Item1.Max(cmp => cmp.Value) + tuples.Item2 + 1;
+                    snapTextOffset = snapTextOffset + mapping.Item1.Max(cmp => cmp.Value) + sectionTextPart.Item2 + 1;
                 }
-                else if (tuples.Item2 > 0)
+                else if (sectionTextPart.Item2 > 0)
                 {
-                    snapTextOffset = snapTextOffset + tuples.Item2 + 1;
+                    snapTextOffset = snapTextOffset + sectionTextPart.Item2 + 1;
                     editTextOffset = editTextOffset + 1;
                 }
             }
             mapEditSnapPos = dictEditToSnapPosData;
             mapSnapEditPos = dictSnapToEditPosData;
+
 
 
             if (mapEditSnapPos.Count > 0)
@@ -567,6 +595,87 @@ namespace SnapTestDocuments
             if (mapSnapEditPos.Count > 0)
             {
                 SnapMaxPos = mapSnapEditPos.Max(check => check.Key) + 1;
+            }
+
+            if (true == sectionParagraphs?.Contains(SnapMaxPos - 1))
+            {
+                dictEditToSnapPosData[EditMaxPos] = SnapMaxPos;
+                dictEditToSnapPosData[EditMaxPos + 1] = SnapMaxPos;
+
+                dictSnapToEditPosData[SnapMaxPos] = EditMaxPos;
+                SnapMaxPos++;
+                EditMaxPos++;
+                textSections[textSections.Count-1] = new Tuple<string, int>(textSections.Last().Item1 + "\r\n", textSections.Last().Item2);
+            }
+
+
+            StringBuilder textBuilder = new StringBuilder();
+
+            textSections.ForEach(textPart => textBuilder.Append(textPart.Item1));
+            textEditImage = textBuilder.ToString();
+            
+            int compOP = texControl.CompareTo(textEditImage);
+
+            {
+                log.InfoFormat("Comparsion sectionText:'{0}'  textParts:'{1}' - result {2}", texControl, textEditImage, compOP);
+                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textEditImage.Length, texControl.Length, EditMaxPos );
+                
+            }    
+
+            if (textEditImage.Length < EditMaxPos + 1)
+            {
+                textEditImage = textEditImage.PadRight(EditMaxPos+1, '`');
+            }
+
+            if (texControl.Length < EditMaxPos + 1)
+            {
+                texControl = texControl.PadRight(EditMaxPos + 1, '`');
+            }
+
+            if (log.IsInfoEnabled && textSections.Count < 20)
+            {
+                if (mapSnapEditPos.Max(check => check.Value) + 1 > EditMaxPos)
+                {
+                    log.InfoFormat("Found wrong EditPos {0}", mapSnapEditPos.Max(check => check.Value) + 1);
+                    var keyList = new List<int>(mapSnapEditPos.Keys);
+
+                    foreach(var keyEelem in keyList)
+                    {
+                        if (mapSnapEditPos[keyEelem] > EditMaxPos)
+                        {
+                            mapSnapEditPos[keyEelem] = EditMaxPos;
+                        }
+                    }
+                }
+
+                var keyValItems = mapEditSnapPos.ToArray();
+                StringBuilder mapTextBuilderES = new StringBuilder();
+                mapTextBuilderES.AppendLine();
+                for ( int keyIndex = 0;  keyIndex < keyValItems.Length; keyIndex++)
+                {
+                    var charText = textEditImage[keyValItems[keyIndex].Key];
+                    var chaVal = Char.IsWhiteSpace(charText) ? String.Format("0x{0:X2}", ((byte)charText)) : String.Format("{0}", charText);
+                    var charTextSect = texControl[keyValItems[keyIndex].Key];
+                    var chaValSect = Char.IsWhiteSpace(charTextSect) ? String.Format("0x{0:X2}", ((byte)charTextSect)) : String.Format("{0}", charTextSect);
+                    mapTextBuilderES.Append("ID:").Append(keyIndex).Append(",E_id:").Append(keyValItems[keyIndex].Key).Append(",E_val:").Append(chaVal);
+                    mapTextBuilderES.Append("   ,T_id:").Append(keyValItems[keyIndex].Key).Append(",T_val:").Append(chaValSect);
+                    mapTextBuilderES.Append("   ,S_id:").Append(keyValItems[keyIndex].Value).Append(",S_val:").Append(control.Document.GetText(control.Document.CreateRange(keyValItems[keyIndex].Value + sectionOffset, 1))).AppendLine();
+                }
+                log.Info("MapEditSnap: " + mapTextBuilderES.ToString());
+                keyValItems = mapSnapEditPos.ToArray();
+                StringBuilder mapTextBuilderSE = new StringBuilder();
+                mapTextBuilderSE.AppendLine();
+                for (int keyIndex = 0; keyIndex < keyValItems.Length; keyIndex++)
+                {
+                    var charText = textEditImage[keyValItems[keyIndex].Value];
+                    var chaVal = Char.IsWhiteSpace(charText) ? String.Format("0x{0:X2}", ((byte)charText)) : String.Format("{0}", charText);
+                    var charTextSect = texControl[keyValItems[keyIndex].Value];
+                    var chaValSect = Char.IsWhiteSpace(charTextSect) ? String.Format("0x{0:X2}", ((byte)charTextSect)) : String.Format("{0}", charTextSect);
+                    mapTextBuilderSE.Append("ID:").Append(keyIndex).Append(",S_id:").Append(keyValItems[keyIndex].Key).Append(",S_val:").Append(control.Document.GetText(control.Document.CreateRange(keyValItems[keyIndex].Key + sectionOffset, 1)));
+                    mapTextBuilderSE.Append("   ,E_id:").Append(keyValItems[keyIndex].Value).Append(",E_val:").Append(chaVal);
+                    mapTextBuilderSE.Append("   ,T_id:").Append(keyValItems[keyIndex].Value).Append(",T_val:").Append(chaValSect).AppendLine();
+                }
+                log.Info("MapSnapEdit: " + mapTextBuilderSE.ToString());
             }
         }
 
@@ -579,19 +688,19 @@ namespace SnapTestDocuments
                 {
                     if (editPos == EditMaxPos)
                     {
-                        log.InfoFormat("EditToSnap: Edit Pos just past max character count : {0} from {1}, at:{2}", editPos, CallMethod, LineNumber);
+                        log.DebugFormat("EditToSnap: Edit Pos just past max character count : {0} from {1}, at:{2}", editPos, CallMethod, LineNumber);
                         snapPos = SnapMaxPos;
 
                     }
                     else
                     {
-                        log.InfoFormat("EditToSnap: Edit Pos too large : {0} and max is {1} from {2}, at:{3}", editPos, EditMaxPos, CallMethod, LineNumber);
+                        log.DebugFormat("EditToSnap: Edit Pos too large : {0} and max is {1} from {2}, at:{3}", editPos, EditMaxPos, CallMethod, LineNumber);
                         snapPos = SnapMaxPos;
                     }
                 }
                 else
                 {
-                    log.InfoFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
+                    log.DebugFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
                     snapPos = editPos;
                 }
             }
@@ -607,18 +716,18 @@ namespace SnapTestDocuments
                 {
                     if (snapPos == SnapMaxPos)
                     {
-                        log.InfoFormat("SnapToEdit: Just past snap text range: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                        log.DebugFormat("SnapToEdit: Just past snap text range: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
                         editPos = EditMaxPos;
                     }
                     else
                     {
-                        log.InfoFormat("SnapToEdit: Snap post too large than text range: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                        log.DebugFormat("SnapToEdit: Snap post too large than text range: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
                         editPos = EditMaxPos;
                     }
                 }
                 else
                 {
-                    log.InfoFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                    log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
                     editPos = snapPos;
                 }
             }

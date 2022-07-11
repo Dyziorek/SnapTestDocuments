@@ -9,6 +9,9 @@ using System.Windows.Forms;
 using System.Xml.Linq;
 using DevExpress.Snap;
 using DevExpress.XtraRichEdit.Services;
+using log4net;
+using log4net.Appender;
+using log4net.Repository;
 
 namespace SnapTestDocuments
 {
@@ -259,19 +262,31 @@ namespace SnapTestDocuments
 
         private void buttonLog_Click(object sender, EventArgs e)
         {
-            var rootData = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
+                ILoggerRepository rep = LogManager.GetRepository();
+                foreach (IAppender appender in rep.GetAppenders())
+                {
+                    var buffered = appender as BufferingAppenderSkeleton;
+                    if (buffered != null)
+                    {
+                        buffered.Flush();
+                    }
+                }
 
-            if (rootData.Level == log4net.Core.Level.Debug)
-            {
-                rootData.Level = log4net.Core.Level.Info;
-            }
-            else
-            {
-                rootData.Level = log4net.Core.Level.Debug;
-            }
 
-            ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
-            button1.Text = "Log (" + rootData.Level.Name + ")";
+
+            //var rootData = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
+
+            //if (rootData.Level == log4net.Core.Level.Debug)
+            //{
+            //    rootData.Level = log4net.Core.Level.Info;
+            //}
+            //else
+            //{
+            //    rootData.Level = log4net.Core.Level.Debug;
+            //}
+
+            //((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
+            //button1.Text = "Log (" + rootData.Level.Name + ")";
         }
     }
 }
