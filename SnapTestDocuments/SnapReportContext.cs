@@ -134,7 +134,7 @@ namespace SnapTestDocuments
     }
 
 
-    public interface IDragonAccessManager : ITextEditManager
+    public interface IDragonAccessManager : ITextEditManager, ISnapEditManager
     {
         string GetText();
         int GetTextLen();
@@ -149,6 +149,12 @@ namespace SnapTestDocuments
 
         void UpdateSelectedItem(DocumentEntityBase selectedItem);
         bool HasSections();
+    }
+
+    public interface ISnapEditManager
+    {
+        int SnapFromEdit(int editPos);
+        int EditFromSnap(int snapPos);
     }
 
     public interface IInterpSectionsManager : ITextEditManager

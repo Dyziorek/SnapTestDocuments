@@ -51,6 +51,7 @@ namespace SnapTestDocuments
             this.btnSection = new System.Windows.Forms.Button();
             this.lbSections = new System.Windows.Forms.ListBox();
             this.button1 = new System.Windows.Forms.Button();
+            this.buttonDump = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.snapDockManager1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
@@ -223,6 +224,16 @@ namespace SnapTestDocuments
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.buttonLog_Click);
             // 
+            // buttonDumo
+            // 
+            this.buttonDump.Location = new System.Drawing.Point(840, 118);
+            this.buttonDump.Name = "buttonDumo";
+            this.buttonDump.Size = new System.Drawing.Size(90, 23);
+            this.buttonDump.TabIndex = 6;
+            this.buttonDump.Text = "Log Dump";
+            this.buttonDump.UseVisualStyleBackColor = true;
+            this.buttonDump.Click += new System.EventHandler(this.buttonDumo_Click);
+            // 
             // SnapControlForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -230,6 +241,7 @@ namespace SnapTestDocuments
             this.ClientSize = new System.Drawing.Size(1211, 697);
             this.Controls.Add(this.lbSections);
             this.Controls.Add(this.btnPasteText);
+            this.Controls.Add(this.buttonDump);
             this.Controls.Add(this.button1);
             this.Controls.Add(this.btnSection);
             this.Controls.Add(this.btnDocSetup);
@@ -277,6 +289,7 @@ namespace SnapTestDocuments
         private System.Windows.Forms.Button button1;
         private ExtSnapControl snapControl2;
         public ExtTextControl textBox1;
+        private System.Windows.Forms.Button buttonDump;
     }
 }
 

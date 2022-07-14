@@ -424,7 +424,7 @@ namespace SnapTestDocuments
                             rectObj = _currentContext.GetManager<IDragonAccessManager>().PosFromChar((int)m.WParam);
                             if (log.IsDebugEnabled)
                             {
-                                log.DebugFormat("Position  C:{0},mapped:{4},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result, dictationHelper.EditToSnap((int)m.WParam));
+                                log.DebugFormat("Position  C:{0},mapped:{4},X:{1},Y:{2} ret:{3:X8}", (int)m.WParam, rectObj.X, rectObj.Y, (int)m.Result, _currentContext.GetManager<IDragonAccessManager>().SnapFromEdit((int)m.WParam));
                             }
                             if (rectObj.IsEmpty)
                             {

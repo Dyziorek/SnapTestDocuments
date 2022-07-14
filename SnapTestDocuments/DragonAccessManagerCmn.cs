@@ -123,7 +123,8 @@ namespace SnapTestDocuments
 
         private void DragonAccessManagerCmn_ContentChanged(object sender, EventArgs e)
         {
-            log.Debug("SnapControl_ContentChanged:");
+            log4net.ILog logDict = log4net.LogManager.GetLogger("DragonDictationHelper");
+            logDict.DebugFormat("SnapControl_ContentChanged: {0}");
             bool textMapped = false;
             if (currentSelectedInterp != null)
             {
@@ -153,7 +154,14 @@ namespace SnapTestDocuments
                     {
                         cacheStringText += "\r\n";
                     }
-                    textMapped = dictationHelper.AnalyzeTextSection(SnapCtrl, currentSectionField.Field.ToSnap().ResultRange, cacheStringText,  paragraphPositions.Select(sectionParagraph => sectionParagraph - currentSectionOffset));
+                    var correctMapping = dictationHelper.AnalyzeTextSection(SnapCtrl, currentSectionField.Field.ToSnap().ResultRange, cacheStringText,  paragraphPositions.Select(sectionParagraph => sectionParagraph - currentSectionOffset));
+                    var form = SnapCtrl.FindForm() as SnapControlForm;
+                    if (form != null)
+                    {
+                        form.AlertAlign(correctMapping);
+                    }
+
+                    textMapped = true;
                 }
                 else
                 {
@@ -227,8 +235,8 @@ namespace SnapTestDocuments
                     currentSectionField = sectionField.GetTextFieldInfo(SnapCtrl.Document);
                     currentSelectedInterp = selectedEntityObject;
                     lastCharRect = new Tuple<int, Rectangle>(-1, Rectangle.Empty);
-                    DragonAccessManagerCmn_ContentChanged(this, EventArgs.Empty);
                     DragonAccessManagerCmn_SelectionChanged(this, EventArgs.Empty);
+                    DragonAccessManagerCmn_ContentChanged(this, EventArgs.Empty);
                     requestSelectPair = lastSelectionPair;
                 }
                 else
@@ -489,6 +497,16 @@ namespace SnapTestDocuments
         {
             snapCtrlCtx.SnapControl.ContentChanged -= DragonAccessManagerCmn_ContentChanged;
             snapCtrlCtx.SnapControl.SelectionChanged -= DragonAccessManagerCmn_SelectionChanged;
+        }
+
+        public int SnapFromEdit(int editPos)
+        {
+            return dictationHelper.EditToSnap(editPos);
+        }
+
+        public int EditFromSnap(int snapPos)
+        {
+            return dictationHelper.SnapToEdit(snapPos);
         }
     }
 }

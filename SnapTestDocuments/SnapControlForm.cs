@@ -183,6 +183,15 @@ namespace SnapTestDocuments
             }
         }
 
+        internal void AlertAlign(bool correctMapping)
+        {
+            if (!correctMapping)
+                btnSection.BackColor = System.Drawing.Color.Red;
+            else
+                btnSection.BackColor = System.Drawing.SystemColors.Control;
+
+        }
+
         private void btnSection_Click(object sender, EventArgs e)
         {
 
@@ -262,31 +271,33 @@ namespace SnapTestDocuments
 
         private void buttonLog_Click(object sender, EventArgs e)
         {
-                ILoggerRepository rep = LogManager.GetRepository();
-                foreach (IAppender appender in rep.GetAppenders())
+               
+            var rootData = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
+
+            if (rootData.Level == log4net.Core.Level.Debug)
+            {
+                rootData.Level = log4net.Core.Level.Info;
+            }
+            else
+            {
+                rootData.Level = log4net.Core.Level.Debug;
+            }
+
+            ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
+            button1.Text = "Log (" + rootData.Level.Name + ")";
+        }
+
+        private void buttonDumo_Click(object sender, EventArgs e)
+        {
+            ILoggerRepository rep = LogManager.GetRepository();
+            foreach (IAppender appender in rep.GetAppenders())
+            {
+                var buffered = appender as BufferingAppenderSkeleton;
+                if (buffered != null)
                 {
-                    var buffered = appender as BufferingAppenderSkeleton;
-                    if (buffered != null)
-                    {
-                        buffered.Flush();
-                    }
+                    buffered.Flush();
                 }
-
-
-
-            //var rootData = ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).Root;
-
-            //if (rootData.Level == log4net.Core.Level.Debug)
-            //{
-            //    rootData.Level = log4net.Core.Level.Info;
-            //}
-            //else
-            //{
-            //    rootData.Level = log4net.Core.Level.Debug;
-            //}
-
-            //((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
-            //button1.Text = "Log (" + rootData.Level.Name + ")";
+            }
         }
     }
 }

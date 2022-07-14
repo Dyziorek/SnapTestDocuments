@@ -49,6 +49,19 @@ namespace SnapTestDocuments
             return !firstOperand.Equals(new Tuple<int, int>(-1, -1));
         }
 
+        public static int SnapLengthText(this StringBuilder textSection)
+        {
+            var countLines = textSection.ToString().Count( varCheck => {
+                if (varCheck == '\r')
+                {
+                    return true;
+                }
+                return false;
+            });
+
+            return textSection.Length - countLines;
+        }
+
         public static int CompareFieldRange(this Field fld, int caretPos)
         {
             if (caretPos < fld.Range.Start.ToInt())
@@ -184,7 +197,6 @@ namespace SnapTestDocuments
         private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
         private ITextEditWinFormsUIContext _snapCtrlContext;
         private string textEditImage;
-
 
         protected IEmptyMergeFieldCharacterPropertiesManager EmptyMergeFieldCharacterPropertiesMgr { get { return _snapCtrlContext.GetManager<IEmptyMergeFieldCharacterPropertiesManager>(); } }
         protected ICustomFieldEditManager CustomFieldEditMgr { get { return _snapCtrlContext.GetManager<ICustomFieldEditManager>(); } }
@@ -379,9 +391,9 @@ namespace SnapTestDocuments
                     }
                 }
 
-                MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
+                
 
-                return true;
+                return MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
             }
             return false;
         }
@@ -389,13 +401,13 @@ namespace SnapTestDocuments
         private void AnalyzeNestedFields(SnapControl control, FieldTreeNode fieldElement, ref int initialRange, List<Tuple<string, int>> stringParts)
         {
             // first check if current field has resultRange text before first nested field
-            if (fieldElement.Data.ResultRange.Start < fieldElement.FirstChild.Data.ResultRange.Start)
-            {
+            //if (fieldElement.Data.ResultRange.Start < fieldElement.FirstChild.Data.ResultRange.Start)
+            //{
 
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
-                                fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), 0));
-                initialRange = fieldElement.FirstChild.Data.Range.Start.ToInt();
-            }
+            //    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
+            //                fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), 0));
+            //    initialRange = fieldElement.FirstChild.Data.Range.Start.ToInt();
+            //}
 
             foreach (var childItem in fieldElement.Children)
             {
@@ -406,7 +418,17 @@ namespace SnapTestDocuments
                 else
                 {
                     var currentChild = childItem.Data;
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, currentChild.Range.Start.ToInt() - initialRange)), currentChild.CodeRange.Length + 2));
+                    // check if current field has resultRange text before first nested field
+                    if (fieldElement.FirstChild == childItem && fieldElement.Data.ResultRange.Start < fieldElement.FirstChild.Data.ResultRange.Start)
+                    {
+                        stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
+                            fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), currentChild.CodeRange.Length + 2));
+                        initialRange = fieldElement.FirstChild.Data.Range.Start.ToInt();
+                    }
+                    else
+                    {
+                        stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, currentChild.Range.Start.ToInt() - initialRange)), currentChild.CodeRange.Length + 2));
+                    }
                     stringParts.Add(new Tuple<string, int>(control.Document.GetText(currentChild.ResultRange), 1));
                     initialRange = currentChild.Range.End.ToInt();
                 }
@@ -515,14 +537,15 @@ namespace SnapTestDocuments
             return new Tuple<Dictionary<int, int>, Dictionary<int, int>>(dictEditPosData, dictSnapPosData);
         }
 
-        public void MapTextPositions(List<Tuple<string, int>> textSections, IEnumerable<int> sectionParagraphs, string texControl, SnapControl control, int sectionOffset)
+        public bool MapTextPositions(List<Tuple<string, int>> textSections, IEnumerable<int> sectionParagraphs, string texControl, SnapControl control, int sectionOffset)
         {
             int snapTextOffset = 0;
             int editTextOffset = 0;
             int fieldOffsets = 0;
             var dictEditToSnapPosData = new Dictionary<int, int>();
             var dictSnapToEditPosData = new Dictionary<int, int>();
-            for(int index = 0; index < textSections.Count; index++)
+            StringBuilder textBuilder = new StringBuilder();
+            for (int index = 0; index < textSections.Count; index++)
             {
                 var sectionOffseted = sectionParagraphs.Select(sectionOffsetPart => sectionOffsetPart -= fieldOffsets).ToList();
                 if (textSections[index].Item2 > 0)
@@ -530,17 +553,22 @@ namespace SnapTestDocuments
                     fieldOffsets += textSections[index].Item2;
                 }
                 var strTextPart = textSections[index].Item1;
-                if (sectionOffseted.Contains(strTextPart.Length + 1))
+                textBuilder.Append(strTextPart);
+                if (sectionOffseted.Contains(textBuilder.SnapLengthText() + 1))
                 {
                     strTextPart += "\r\n";
+                    textBuilder.AppendLine();
                     textSections[index] = new Tuple<string, int>(strTextPart, textSections[index].Item2);
                 }
+                
             }
 
-
+            StringBuilder validatorBuilder = new StringBuilder();
             foreach (var sectionTextPart in textSections)
             {
-                var mapping = MapTextPositions(sectionTextPart.Item1, true, null);
+                var textPartCheck = sectionTextPart.Item1;
+                validatorBuilder.Append(textPartCheck);
+                var mapping = MapTextPositions(textPartCheck, true, null);
                 foreach (var mapEdits in mapping.Item1)
                 {
                     dictEditToSnapPosData[mapEdits.Key + editTextOffset] = mapEdits.Value + snapTextOffset;
@@ -579,8 +607,20 @@ namespace SnapTestDocuments
                 }
                 else if (sectionTextPart.Item2 > 0)
                 {
-                    snapTextOffset = snapTextOffset + sectionTextPart.Item2 + 1;
-                    editTextOffset = editTextOffset + 1;
+                    if (dictEditToSnapPosData.Count > 0)
+                    {
+                        snapTextOffset = snapTextOffset + sectionTextPart.Item2 + 1;
+                        editTextOffset = editTextOffset + 1;
+                    }
+                    else
+                    {
+                        snapTextOffset = snapTextOffset + sectionTextPart.Item2;
+                    }
+                }
+
+                if (validatorBuilder.Length != editTextOffset)
+                {
+                    log.InfoFormat("Mapping data has errors  textLen:{0}, editMax:{1}", validatorBuilder.Length, editTextOffset);
                 }
             }
             mapEditSnapPos = dictEditToSnapPosData;
@@ -609,16 +649,16 @@ namespace SnapTestDocuments
             }
 
 
-            StringBuilder textBuilder = new StringBuilder();
+            //StringBuilder textBuilder = new StringBuilder();
 
-            textSections.ForEach(textPart => textBuilder.Append(textPart.Item1));
+            //textSections.ForEach(textPart => textBuilder.Append(textPart.Item1));
             textEditImage = textBuilder.ToString();
             
             int compOP = texControl.CompareTo(textEditImage);
-
+            var textImageSize = textEditImage.Length;
             {
                 log.InfoFormat("Comparsion sectionText:'{0}'  textParts:'{1}' - result {2}", texControl, textEditImage, compOP);
-                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textEditImage.Length, texControl.Length, EditMaxPos );
+                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textImageSize, texControl.Length, EditMaxPos );
                 
             }    
 
@@ -659,7 +699,14 @@ namespace SnapTestDocuments
                     var chaValSect = Char.IsWhiteSpace(charTextSect) ? String.Format("0x{0:X2}", ((byte)charTextSect)) : String.Format("{0}", charTextSect);
                     mapTextBuilderES.Append("ID:").Append(keyIndex).Append(",E_id:").Append(keyValItems[keyIndex].Key).Append(",E_val:").Append(chaVal);
                     mapTextBuilderES.Append("   ,T_id:").Append(keyValItems[keyIndex].Key).Append(",T_val:").Append(chaValSect);
-                    mapTextBuilderES.Append("   ,S_id:").Append(keyValItems[keyIndex].Value).Append(",S_val:").Append(control.Document.GetText(control.Document.CreateRange(keyValItems[keyIndex].Value + sectionOffset, 1))).AppendLine();
+                    if (log.IsDebugEnabled)
+                    {
+                        mapTextBuilderES.Append("   ,S_id:").Append(keyValItems[keyIndex].Value).Append(",S_val:").Append(control.Document.GetText(control.Document.CreateRange(keyValItems[keyIndex].Value + sectionOffset, 1))).AppendLine();
+                    }
+                    else
+                    {
+                        mapTextBuilderES.AppendLine();
+                    }
                 }
                 log.Info("MapEditSnap: " + mapTextBuilderES.ToString());
                 keyValItems = mapSnapEditPos.ToArray();
@@ -671,12 +718,22 @@ namespace SnapTestDocuments
                     var chaVal = Char.IsWhiteSpace(charText) ? String.Format("0x{0:X2}", ((byte)charText)) : String.Format("{0}", charText);
                     var charTextSect = texControl[keyValItems[keyIndex].Value];
                     var chaValSect = Char.IsWhiteSpace(charTextSect) ? String.Format("0x{0:X2}", ((byte)charTextSect)) : String.Format("{0}", charTextSect);
-                    mapTextBuilderSE.Append("ID:").Append(keyIndex).Append(",S_id:").Append(keyValItems[keyIndex].Key).Append(",S_val:").Append(control.Document.GetText(control.Document.CreateRange(keyValItems[keyIndex].Key + sectionOffset, 1)));
-                    mapTextBuilderSE.Append("   ,E_id:").Append(keyValItems[keyIndex].Value).Append(",E_val:").Append(chaVal);
+                    mapTextBuilderSE.Append("ID:").Append(keyIndex);
+                    if (log.IsDebugEnabled)
+                    {
+                        mapTextBuilderSE.Append(",S_id:").Append(keyValItems[keyIndex].Key).Append(",S_val:").Append(control.Document.GetText(control.Document.CreateRange(keyValItems[keyIndex].Key + sectionOffset, 1)));
+                        mapTextBuilderSE.Append("   ,E_id:").Append(keyValItems[keyIndex].Value).Append(",E_val:").Append(chaVal);
+                    }
+                    else
+                    {
+                        mapTextBuilderSE.Append(",E_id:").Append(keyValItems[keyIndex].Value).Append(",E_val:").Append(chaVal);
+                    }
                     mapTextBuilderSE.Append("   ,T_id:").Append(keyValItems[keyIndex].Value).Append(",T_val:").Append(chaValSect).AppendLine();
                 }
                 log.Info("MapSnapEdit: " + mapTextBuilderSE.ToString());
             }
+
+            return textImageSize == EditMaxPos;
         }
 
         public int EditToSnap(int editPos, [System.Runtime.CompilerServices.CallerMemberName] string CallMethod = "", [System.Runtime.CompilerServices.CallerLineNumber] int LineNumber = 0)
@@ -700,7 +757,10 @@ namespace SnapTestDocuments
                 }
                 else
                 {
-                    log.DebugFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
+                    if (log.IsDebugEnabled)
+                    {
+                        log.DebugFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
+                    }
                     snapPos = editPos;
                 }
             }
@@ -727,7 +787,11 @@ namespace SnapTestDocuments
                 }
                 else
                 {
-                    log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                    if (log.IsDebugEnabled)
+                    {
+                       log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
+                    }
+                    
                     editPos = snapPos;
                 }
             }
