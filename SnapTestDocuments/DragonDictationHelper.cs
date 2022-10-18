@@ -35,18 +35,26 @@ namespace SnapTestDocuments
             }
             fullPack.Append(")").AppendLine();
             return fullPack.ToString();
-            
+
         }
 
-        
+
     }
 
+
+    public enum FieldLocationType
+    {
+        BeforeField,
+        InsideField,
+        AfterField
+    }
 
     public static class DragonDictationTools
     {
         public static int SnapLengthText(this StringBuilder textSection)
         {
-            var countLines = textSection.ToString().Count( varCheck => {
+            var countLines = textSection.ToString().Count(varCheck =>
+            {
                 if (varCheck == '\r')
                 {
                     return true;
@@ -57,42 +65,196 @@ namespace SnapTestDocuments
             return textSection.Length - countLines;
         }
 
-        public static int CompareFieldRange(this Field fld, int caretPos)
+        public static List<Tuple<string, int>> GetStringParts(this List<FieldTreeNode> cacheFields)
         {
-            if (caretPos < fld.Range.Start.ToInt())
+            List<Tuple<string, int>> stringElements = new List<Tuple<string, int>>();
+            foreach (FieldTreeNode fieldLook in cacheFields)
             {
-                return -1;
+                stringElements.AddRange(fieldLook.GetCachedStringData());
             }
-            else if (caretPos > fld.Range.End.ToInt())
-            {
-                return 1;
-            }
-            else
-            {
-                return 0;
-            }
+
+            return stringElements;
         }
 
-        public static void ArrangeFields(this List<FieldTreeNode> baseFields, FieldLinkedList fields, SnapControl control, log4net.ILog log)
+        public static FieldTreeNode ToNodeField(this List<FieldTreeNode> cacheFields, Field fieldNode)
+        {
+            foreach (FieldTreeNode fieldLook in cacheFields)
+            {
+                if (fieldNode.Equals(fieldLook.Data))
+                {
+                    return fieldLook;
+                }
+                var childElems = fieldLook.Children.Where(elemCheck => elemCheck.Data.Equals(fieldNode));
+                if (childElems.Count() == 1)
+                {
+                    return childElems.First();
+                }
+            }
+            return null;
+        }
+
+        public static Field GetNextField(this List<FieldTreeNode> localFields, Field checkingField)
+        {
+            int minimalDistance = int.MaxValue;
+            Field closestField = null;
+            int selectionPosition = checkingField.ResultRange.End.ToInt();
+            foreach (FieldTreeNode fieldLook in localFields)
+            {
+                int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
+                var distance = Math.Abs(selectionPosition - fieldCheckPosition);
+                if (distance < minimalDistance && (selectionPosition - fieldCheckPosition) < 0)
+                {
+                    closestField = fieldLook.Data;
+                    minimalDistance = distance;
+                    var childField = fieldLook.closestNextField(selectionPosition, ref minimalDistance);
+                    if (childField != null)
+                    {
+                        closestField = childField;
+                    }
+                }
+            }
+
+            return closestField;
+        }
+
+        public static Field GetPreviousField(this List<FieldTreeNode> localFields, Field checkingField)
+        {
+            if (localFields.First().Data.Equals(checkingField))
+            {
+                return null;
+            }
+
+            int minimalDistance = int.MaxValue;
+            Field closestField = null;
+            int selectionPosition = checkingField.ResultRange.End.ToInt();
+            foreach (FieldTreeNode fieldLook in localFields)
+            {
+                int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
+                var distance = Math.Abs(selectionPosition - fieldCheckPosition);
+                if (distance < minimalDistance && !fieldLook.Data.Equals(checkingField))
+                {
+                    closestField = fieldLook.Data;
+                    minimalDistance = distance;
+                    var childField = fieldLook.closestNodeField(selectionPosition, ref minimalDistance, true);
+                    if (childField != null)
+                    {
+                        closestField = childField;
+                    }
+                }
+                else if (fieldLook.Data.Equals(checkingField))
+                {
+                    return closestField;
+                }
+            }
+
+            return closestField;
+        }
+
+        public static Field GetNearestField(this List<FieldTreeNode> localFields, int selectionPosition, bool fromEnd)
+        {
+            int minimalDistance = int.MaxValue;
+            Field closestField = null;
+            foreach (FieldTreeNode fieldLook in localFields)
+            {
+                int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
+                if (!fromEnd)
+                {
+                    fieldCheckPosition = fieldLook.Data.ResultRange.Start.ToInt();
+                }
+                var distance = Math.Abs(selectionPosition - fieldCheckPosition);
+                if (distance < minimalDistance)
+                {
+                    closestField = fieldLook.Data;
+                    minimalDistance = distance;
+                    var childField = fieldLook.closestNodeField(selectionPosition, ref minimalDistance, fromEnd);
+                    if (childField != null)
+                    {
+                        closestField = childField;
+                    }
+                }
+                else
+                {
+                    return closestField;
+                }
+            }
+
+            return closestField;
+        }
+
+        public static Field GetNeighborField(this List<FieldTreeNode> fields, Field locationField)
+        {
+            int minimalDistance = int.MaxValue;
+            int referenceLocation = locationField.ResultRange.End.ToInt();
+            Field closestField = null;
+            foreach (FieldTreeNode fieldLook in fields)
+            {
+                int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
+                var distance = Math.Abs(referenceLocation - fieldCheckPosition);
+                if (distance < minimalDistance && !fieldLook.Data.Equals(locationField))
+                {
+                    closestField = fieldLook.Data;
+                    minimalDistance = distance;
+                    var childField = fieldLook.ClosestNeighborNodeField(referenceLocation, ref minimalDistance, locationField);
+                    if (childField != null)
+                    {
+                        closestField = childField;
+                    }
+                }
+            }
+
+            return closestField;
+        }
+
+        public static KeyValuePair<String, String> IsCacheValid(this List<FieldTreeNode> fields, string controlText, IEnumerable<int> sectionParagraphs)
+        {
+
+            int fieldOffsets = 0;
+            var textSections = fields.GetStringParts();
+
+            StringBuilder textBuilder = new StringBuilder();
+            for (int index = 0; index < textSections.Count; index++)
+            {
+                var sectionOffseted = sectionParagraphs.Select(sectionOffsetPart => sectionOffsetPart -= fieldOffsets).ToList();
+                if (textSections[index].Item2 > 0)
+                {
+                    fieldOffsets += textSections[index].Item2;
+                }
+                var strTextPart = textSections[index].Item1;
+                textBuilder.Append(strTextPart);
+                if (sectionOffseted.Contains(textBuilder.SnapLengthText() + 1))
+                {
+                    strTextPart += "\r\n";
+                    textBuilder.AppendLine();
+                    textSections[index] = new Tuple<string, int>(strTextPart, textSections[index].Item2);
+                }
+            }
+
+            //var comparisonEqual = controlText?.CompareTo(textBuilder.ToString());
+            //return comparisonEqual.HasValue ? comparisonEqual == 0 : false;
+            return new KeyValuePair<string, string>(controlText, textBuilder.ToString());
+        }
+
+        public static int NodeCount(this List<FieldTreeNode> fieldTreeNodes)
+        {
+            return fieldTreeNodes.Sum(elem => elem.AllChildren.Count + 1);
+        }
+
+        public static void ArrangeFields(this List<FieldTreeNode> baseFields, FieldLinkedList fields)
         {
             var fieldElem = fields.First;
-            string fieldCode = "(AnyField)";
-            if (log.IsDebugEnabled)
-            {
-                fieldCode = VerifyField(fieldElem.Value, control);
-            }
-            baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCode, control.Document.GetText(fieldElem.Value.ResultRange )));
+            baseFields.Clear();
+            baseFields.Add(new FieldTreeNode(fieldElem.Value));
             while (fieldElem.Next != null)
             {
                 fieldElem = fieldElem.Next;
                 if (fieldElem.Value.Parent != null)
                 {
                     bool found = false;
-                    foreach(FieldTreeNode node in baseFields)
+                    foreach (FieldTreeNode node in baseFields)
                     {
                         if (node.Data.Range.Start == fieldElem.Value.Parent.Range.Start && node.Data.Range.End == fieldElem.Value.Parent.Range.End)
                         {
-                            node.AddChild(fieldElem, control);
+                            node.AddChild(fieldElem);
                             found = true;
                         }
                         else
@@ -100,76 +262,28 @@ namespace SnapTestDocuments
                             var childNode = node.AllChildren.FirstOrDefault(check => check.Data.Range.Start == fieldElem.Value.Parent.Range.Start && check.Data.Range.End == fieldElem.Value.Parent.Range.End);
                             if (childNode != null)
                             {
-                                childNode.AddChild(fieldElem, control);
+                                childNode.AddChild(fieldElem);
                                 found = true;
                             }
-                         }
+                        }
                     }
-
-                    
                     if (!found)
                     {
-                        string fieldCodeChild = "(AnyChildField)";
-                        if (log.IsDebugEnabled)
-                        {
-                            fieldCodeChild = VerifyField(fieldElem.Value, control);
-                        }
-                        baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCodeChild, control.Document.GetText(fieldElem.Value.ResultRange)));
+                        baseFields.Add(new FieldTreeNode(fieldElem.Value));
                     }
                 }
                 else
                 {
-                    string fieldCodeChild = VerifyField(fieldElem.Value, control);
-                    if (fieldCodeChild != null)
-                    {
-                        baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCodeChild, control.Document.GetText(fieldElem.Value.ResultRange)));
-                    }
-                    else
-                    {
-                        baseFields.Add(new FieldTreeNode(fieldElem.Value, "GetTextCall:" + control.Document.GetText(fieldElem.Value.CodeRange), control.Document.GetText(fieldElem.Value.ResultRange)));
-                    }
-
+                    baseFields.Add(new FieldTreeNode(fieldElem.Value));
                 }
             }
         }
 
-        public static string VerifyField(Field value, SnapControl control)
-        {
-            var fld = control.Document.ParseField(value);
-            if (fld is DevExpress.Snap.API.Native.NativeSnapList lst)
-            {
-                return "SnapList:" + lst.Name;
-            }
-            if (fld is DevExpress.Snap.API.Native.NativeSnapListFilters flt)
-            {
-                return "SnapLisFilter:";
-            }
-            if (fld is DevExpress.Snap.API.Native.NativeSnapRowIndex row)
-            {
-                return "SnapRowIndx:" + row.FormatString;
-            }
-            if (fld is DevExpress.Snap.API.Native.NativeSnapSection sct)
-            {
-                return "SnapSection:";
-            }
-            if (fld is DevExpress.Snap.API.Native.NativeSnapText txt)
-            {
-                return "FieldText:" + txt.DataFieldName;
-            }
-            if (fld is DevExpress.Snap.API.Native.NativeSnapSingleListItemEntity se)
-            {
-                return "SingleList:" + se.DataFieldName;
-            }
-            if (fld is DevExpress.Snap.API.Native.NativeSnapEntityBase oth)
-            {
-                return "FieldBase:" + oth.ToString();
-            }
-            return "Unknown field";
-        }
     }
 
     class DragonDictationHelper
     {
+        #region FIELDS
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("DragonDictationHelper");
         /// <summary>
         /// Index Edit position to Snap Position - keys are larger tah values
@@ -181,11 +295,19 @@ namespace SnapTestDocuments
         private Dictionary<int, int> mapSnapEditPos = new Dictionary<int, int>();
         private ITextEditWinFormsUIContext _snapCtrlContext;
         private string textEditImage;
+        private List<FieldTreeNode> fieldNodes = new List<FieldTreeNode>();
 
+        private int SnapMaxPos;
+        private int EditMaxPos;
+
+        protected ISelectionChangedTrackingManager SelectionTrackingMgr { get { return _snapCtrlContext.GetManager<ISelectionChangedTrackingManager>(); } }
         protected IEmptyMergeFieldCharacterPropertiesManager EmptyMergeFieldCharacterPropertiesMgr { get { return _snapCtrlContext.GetManager<IEmptyMergeFieldCharacterPropertiesManager>(); } }
         protected ICustomFieldEditManager CustomFieldEditMgr { get { return _snapCtrlContext.GetManager<ICustomFieldEditManager>(); } }
         protected IPermissionManager PermissionManager { get { return _snapCtrlContext.GetManager<IPermissionManager>(); } }
 
+
+
+        #endregion FIELDS
         public DragonDictationHelper()
         {
 
@@ -195,14 +317,16 @@ namespace SnapTestDocuments
         {
             _snapCtrlContext = controlContext;
 
+
             var FieldCheck = snapField;
+
 
             if (true == CustomFieldEditMgr?.IsEmptyEntityField(FieldCheck, DocumentEntityTypes.EditField))
             {
                 var subDocument = _snapCtrlContext.Document;
                 if (PermissionManager.IsDocumentFieldEditable(FieldCheck))
                 {
-                    DocumentRange rangeToReplace = FieldCheck.ResultRange;
+                    var rangeToReplace = FieldCheck.ResultRange;
 
                     if (EmptyMergeFieldCharacterPropertiesMgr != null)
                         EmptyMergeFieldCharacterPropertiesMgr.AddEmptyMergeFieldsCharacterProperties(FieldCheck, subDocument, subDocument.CreateRange(rangeToReplace.Start, 1));
@@ -216,10 +340,13 @@ namespace SnapTestDocuments
                     {
                         rangeToReplace.EndUpdateDocument(subDocumentUpdate);
                     }
-                    
+
 
                     //selection needs to be removed
                     _snapCtrlContext.Document.Selection = subDocument.CreateRange(FieldCheck.ResultRange.Start, 0);
+
+                    //if (EmptyMergeFieldCharacterPropertiesMgr != null)
+                    //    FontTools.ReplaceFontPropertiesForField(_snapCtrlContext.Document, FieldCheck, _snapCtrlContext.Document.CaretPosition, EmptyMergeFieldCharacterPropertiesMgr, _snapCtrlContext.IsSetup);
 
                     return FieldCheck;
                 }
@@ -227,67 +354,163 @@ namespace SnapTestDocuments
             return null;
         }
 
-        public bool AnalyzeTextSection(SnapControl control, DocumentRange sectionPart, string sectionText,  IEnumerable<int> paragraphsCollection)
+
+        public void AnalyzeTextSection(ITextEditWinFormsUIContext controlContext, SnapControl control, DocumentRange sectionPart, string sectionText, IEnumerable<int> paragraphsCollection, Tuple<int, int> lastSelect)
         {
-            var sectionRange = sectionPart;
-            var fieldRange = SnapFieldTools.GetFieldsInRange(control.Document, sectionRange).ToList();
+            var fieldRange = SnapFieldTools.GetFieldsInRange(control.Document, sectionPart).ToList();
             var paragraphPositions = paragraphsCollection.ToList();
             fieldRange.Sort((field1, field2) => field1.Range.Start.ToInt().CompareTo(field2.Range.Start.ToInt()));
-            List<FieldTreeNode> fieldNodes = new List<FieldTreeNode>();
 
+            if (fieldRange.Count() != fieldNodes.NodeCount())
+            {
+                ResetMappings();
+            }
             if (fieldRange.Count() > 0)
             {
-                // document contains edit fields
-                fieldNodes.ArrangeFields(new FieldLinkedList(fieldRange), control, log);
-                var stringParts = new List<Tuple<string, int>>();
-                int initialRange = sectionRange.Start.ToInt();
-                foreach (var fieldElement in fieldNodes)
+                var cacheInfo = fieldNodes.IsCacheValid(sectionText, paragraphPositions);
+                if (fieldRange.Count() != fieldNodes.NodeCount())
                 {
-                    if (fieldElement.IsLeaf)
-                    {
-                        // no nested fields
-                        var fieldData = fieldElement.Data;
-                        if (fieldData.ResultRange.Start.ToInt() >= initialRange)
-                        {
-                            // text before (or between fields) 
-                            stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
-                            // text inside field
-                            stringParts.Add(new Tuple<string, int>(control.Document.GetText(fieldData.ResultRange), 1));
-                            initialRange = fieldData.Range.End.ToInt();
-                        }
-                    }
-                    else
-                    {
-                        // field has nested fields inside
-                        var fieldData = fieldElement.Data;
-                        if (fieldData.ResultRange.Start.ToInt() >= initialRange)
-                        {
-                            // text before field with nested children
-                            stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
-                            initialRange = fieldData.Range.Start.ToInt() + 1;
-                            AnalyzeNestedFields(control, fieldElement, ref initialRange, stringParts);
-                            initialRange = fieldData.Range.End.ToInt();
-                        }
-                    }
+                    var stringParts = BuildFieldCache(fieldNodes, fieldRange, control, sectionPart);
 
-                }
-                stringParts.Add(new Tuple<string, int>((control.Document.GetText(control.Document.CreateRange(initialRange, sectionPart.End.ToInt() - initialRange))), 0));
-                log.InfoFormat("String parts count:{0}", stringParts.Count);
-                if (log.IsInfoEnabled)
-                {
-                    for (int index = 0; index < stringParts.Count; index++)
+                    var cachedStringParts = fieldNodes.GetStringParts();
+
+                    if (log.IsDebugEnabled)
                     {
-                        log.InfoFormat("Part {0} Elements '{1}' , {2}", index, stringParts[index].Item1, stringParts[index].Item2);
+                        log.DebugFormat("Generated string count {0} cached count {1} Equals {2}", stringParts.Count, cachedStringParts.Count, Enumerable.SequenceEqual(cachedStringParts, stringParts));
+                    }
+                    MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
+                }
+                else if (String.Compare(cacheInfo.Key, cacheInfo.Value) != 0)
+                {
+                    var fieldNode = GetNearestFieldFromPosition(controlContext, lastSelect.Item1);
+                    switch (fieldNode.Item2)
+                    {
+                        case FieldLocationType.BeforeField:
+                            Field previousField = fieldNodes.GetPreviousField(fieldNode.Item1);
+                            int initialRange = sectionPart.Start.ToInt();
+                            if (previousField != null)
+                            {
+                                initialRange = previousField.Range.End.ToInt();
+                            }
+                            var fieldPrefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldNode.Item1.Range.Start.ToInt() - initialRange)), fieldNode.Item1.CodeRange.Length + 2);
+                            fieldNodes.Last().UpdateField(fieldPrefix, null, null);
+                            break;
+                        case FieldLocationType.InsideField:
+                            var fieldText = new Tuple<string, int>(control.Document.GetText(fieldNode.Item1.ResultRange), 1);
+                            fieldNodes.Last().UpdateField(null, fieldText, null);
+                            break;
+                        case FieldLocationType.AfterField:
+                        default:
+                            Field nextField = fieldNodes.GetNextField(fieldNode.Item1);
+                            int endRange = sectionPart.End.ToInt();
+                            if (nextField != null)
+                            {
+                                endRange = fieldNode.Item1.Range.End.ToInt();
+                                var fieldNodeElement = fieldNodes.ToNodeField(nextField);
+                                var fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(endRange, nextField.Range.Start.ToInt() - endRange)), nextField.CodeRange.Length + 2);
+                                fieldNodeElement.UpdateField(fieldprefix, null, null);
+                            }
+                            else
+                            {
+                                var fieldSuffix = new Tuple<string, int>((control.Document.GetText(control.Document.CreateRange(fieldNode.Item1.Range.End.ToInt(), endRange - fieldNode.Item1.Range.End.ToInt()))), 0);
+                                fieldNodes.Last().UpdateField(null, null, fieldSuffix);
+                            }
+                            break;
+                    }
+                    var updateData = fieldNodes.GetStringParts();
+
+#if DEBUG
+                    var cacheCompare = fieldNodes.IsCacheValid(sectionText, paragraphPositions);
+                    if (string.Compare(cacheInfo.Key, cacheInfo.Value) != 0)
+                    {
+                        log.DebugFormat("Invalid cache result {0}", string.Compare(cacheInfo.Key, cacheInfo.Value));
+                        string[] originalTexts = cacheInfo.Key.Split( new String[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        string[] generatedTexts = cacheInfo.Value.Split(new String[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+                        for(int textIdx = 0; textIdx < originalTexts.Length; textIdx++)
+                        {
+                            if (generatedTexts.Length > textIdx)
+                            {
+                                if (!originalTexts[textIdx].Equals(generatedTexts[textIdx]))
+                                {
+                                    log.DebugFormat("Number: {0}, Original Text '{1}', Cache Text '{2}'", textIdx, originalTexts[textIdx], generatedTexts[textIdx]);
+                                }
+                            }
+                            else
+                            {
+                                log.DebugFormat("Number: {0}, Original Text '{1}', No Cached", textIdx, originalTexts[textIdx]);
+                            }
+                        }
+                        var stringParts = BuildFieldCache(fieldNodes, fieldRange, control, sectionPart);
+                    }
+#endif
+                    MapTextPositions(fieldNodes.GetStringParts(), paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
+                }
+            }
+            else
+            {
+                MapTextPositions(sectionText);
+            }
+        }
+
+        public List<Tuple<string, int>> BuildFieldCache(List<FieldTreeNode> nodesCache, List<Field> fieldsToCache, SnapControl control, DocumentRange sectionPart)
+        {
+            fieldNodes.ArrangeFields(new FieldLinkedList(fieldsToCache));
+            var stringParts = new List<Tuple<string, int>>();
+            int initialRange = sectionPart.Start.ToInt();
+            foreach (var fieldElement in fieldNodes)
+            {
+                if (fieldElement.IsLeaf)
+                {
+                    // no nested fields
+                    var fieldData = fieldElement.Data;
+                    if (fieldData.ResultRange.Start.ToInt() >= initialRange)
+                    {
+                        // text before (or between fields) 
+                        var fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2);
+                        stringParts.Add(fieldprefix);
+
+                        // text inside field
+                        var fieldText = new Tuple<string, int>(control.Document.GetText(fieldData.ResultRange), 1);
+                        stringParts.Add(fieldText);
+                        initialRange = fieldData.Range.End.ToInt();
+                        fieldElement.UpdateField(fieldprefix, fieldText, null);
                     }
                 }
-                return MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
+                else
+                {
+                    // field has nested fields inside
+                    var fieldData = fieldElement.Data;
+                    if (fieldData.ResultRange.Start.ToInt() >= initialRange)
+                    {
+                        // text before field with nested children
+                        var fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2);
+                        stringParts.Add(fieldprefix);
+                        initialRange = fieldData.Range.Start.ToInt() + 1;
+                        AnalyzeNestedFields(control, fieldElement, ref initialRange, stringParts);
+                        initialRange = fieldData.Range.End.ToInt();
+                    }
+                }
+
             }
-            return false;
+            var fieldSuffix = new Tuple<string, int>((control.Document.GetText(control.Document.CreateRange(initialRange, sectionPart.End.ToInt() - initialRange))), 0);
+            fieldNodes.Last().UpdateField(null, null, fieldSuffix);
+            stringParts.Add(fieldSuffix);
+
+            log.InfoFormat("String parts count:{0}", stringParts.Count);
+            if (log.IsInfoEnabled)
+            {
+                for (int index = 0; index < stringParts.Count; index++)
+                {
+                    log.InfoFormat("Part {0} Elements '{1}' , {2}", index, stringParts[index].Item1, stringParts[index].Item2);
+                }
+            }
+
+            return stringParts;
         }
 
         private void AnalyzeNestedFields(SnapControl control, FieldTreeNode fieldElement, ref int initialRange, List<Tuple<string, int>> stringParts)
         {
-            
+
             foreach (var childItem in fieldElement.Children)
             {
                 if (!childItem.IsLeaf)
@@ -297,32 +520,38 @@ namespace SnapTestDocuments
                 else
                 {
                     var currentChild = childItem.Data;
+                    Tuple<string, int> fieldprefix;
                     // check if current field has resultRange text before first nested field
                     if (fieldElement.FirstChild == childItem && fieldElement.Data.ResultRange.Start < fieldElement.FirstChild.Data.ResultRange.Start)
                     {
-                        stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
-                            fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), currentChild.CodeRange.Length + 2));
+                        fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
+                            fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), currentChild.CodeRange.Length + 2);
+                        stringParts.Add(fieldprefix);
                         initialRange = fieldElement.FirstChild.Data.Range.Start.ToInt();
                     }
                     else
                     {
-                        stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, currentChild.Range.Start.ToInt() - initialRange)), currentChild.CodeRange.Length + 2));
+                        fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, currentChild.Range.Start.ToInt() - initialRange)), currentChild.CodeRange.Length + 2);
+                        stringParts.Add(fieldprefix);
                     }
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(currentChild.ResultRange), 1));
+                    var fieldText = new Tuple<string, int>(control.Document.GetText(currentChild.ResultRange), 1);
+                    stringParts.Add(fieldText);
                     initialRange = currentChild.Range.End.ToInt();
+                    childItem.UpdateField(fieldprefix, fieldText, null);
                 }
             }
 
             if (fieldElement.Data.ResultRange.End > fieldElement.LastChild.Data.ResultRange.End)
             {
-                stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.LastChild.Data.Range.End.ToInt(),
-                            fieldElement.Data.ResultRange.End.ToInt() - fieldElement.LastChild.Data.Range.End.ToInt())), 1));
+                var fieldTextSuffix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.LastChild.Data.Range.End.ToInt(),
+                            fieldElement.Data.ResultRange.End.ToInt() - fieldElement.LastChild.Data.Range.End.ToInt())), 1);
+                stringParts.Add(fieldTextSuffix);
+                fieldElement.UpdateField(null, null, fieldTextSuffix);
                 initialRange = fieldElement.Data.Range.End.ToInt();
             }
         }
 
-        private int SnapMaxPos;
-        private int EditMaxPos;
+
         /// <summary>
         /// Mapping Snap to Edit postions and vice versa
         /// This code is to simulate TextEdit like behavior in SnapControl
@@ -342,7 +571,7 @@ namespace SnapTestDocuments
         /// for postion 9 returns 9 but for position 15 returns 14.</para>
         /// </summary>
         /// <param name="textSection">Text content on which Dragon dication is working</param>
-        public Tuple<Dictionary<int, int>, Dictionary<int, int>> MapTextPositions(string textSection, bool append = false, IEnumerable<int> sectionParagraphs = null )
+        public Tuple<Dictionary<int, int>, Dictionary<int, int>> MapTextPositions(string textSection, bool append = false, IEnumerable<int> sectionParagraphs = null)
         {
             var dictEditPosData = new Dictionary<int, int>();
             var dictSnapPosData = new Dictionary<int, int>();
@@ -364,7 +593,7 @@ namespace SnapTestDocuments
                     {
                         if (sectionParagraphs != null && sectionParagraphs.Contains(lineText.Length + sumTextEdit + 1))
                         {
-                            dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length  + sumTextSnap;
+                            dictEditPosData[lineText.Length + sumTextEdit] = lineText.Length + sumTextSnap;
                             dictEditPosData[lineText.Length + sumTextEdit + 1] = lineText.Length + sumTextSnap;
                         }
                         else
@@ -416,6 +645,13 @@ namespace SnapTestDocuments
             return new Tuple<Dictionary<int, int>, Dictionary<int, int>>(dictEditPosData, dictSnapPosData);
         }
 
+        public void ResetMappings()
+        {
+            mapEditSnapPos = new Dictionary<int, int>();
+            mapSnapEditPos = new Dictionary<int, int>();
+            fieldNodes = new List<FieldTreeNode>();
+        }
+
         public bool MapTextPositions(List<Tuple<string, int>> textSections, IEnumerable<int> sectionParagraphs, string texControl, SnapControl control, int sectionOffset)
         {
             int snapTextOffset = 0;
@@ -439,7 +675,7 @@ namespace SnapTestDocuments
                     textBuilder.AppendLine();
                     textSections[index] = new Tuple<string, int>(strTextPart, textSections[index].Item2);
                 }
-                
+
             }
 
             StringBuilder validatorBuilder = new StringBuilder();
@@ -504,9 +740,6 @@ namespace SnapTestDocuments
             }
             mapEditSnapPos = dictEditToSnapPosData;
             mapSnapEditPos = dictSnapToEditPosData;
-
-
-
             if (mapEditSnapPos.Count > 0)
             {
                 EditMaxPos = mapEditSnapPos.Max(check => check.Key) + 1;
@@ -524,18 +757,18 @@ namespace SnapTestDocuments
                 dictSnapToEditPosData[SnapMaxPos] = EditMaxPos;
                 SnapMaxPos++;
                 EditMaxPos++;
-                textSections[textSections.Count-1] = new Tuple<string, int>(textSections.Last().Item1 + "\r\n", textSections.Last().Item2);
+                textSections[textSections.Count - 1] = new Tuple<string, int>(textSections.Last().Item1 + "\r\n", textSections.Last().Item2);
             }
 
 
             textEditImage = textBuilder.ToString();
-            
-            int compOP = texControl.CompareTo(textEditImage);
             var textImageSize = textEditImage.Length;
+
+            if (log.IsInfoEnabled)
             {
+                int compOP = texControl.CompareTo(textEditImage);
                 log.InfoFormat("Comparsion sectionText:'{0}'  textParts:'{1}' - result {2}", texControl, textEditImage, compOP);
-                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textImageSize, texControl.Length, EditMaxPos );
-                
+                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textImageSize, texControl.Length, EditMaxPos);
             }
 
             if (log.IsDebugEnabled)
@@ -543,7 +776,7 @@ namespace SnapTestDocuments
                 // this is very slow debug diagnostics code, use this only for error investigation
                 if (textEditImage.Length < EditMaxPos + 1)
                 {
-                    textEditImage = textEditImage.PadRight(EditMaxPos+1, '`');
+                    textEditImage = textEditImage.PadRight(EditMaxPos + 1, '`');
                 }
 
                 if (texControl.Length < EditMaxPos + 1)
@@ -556,7 +789,7 @@ namespace SnapTestDocuments
                     log.InfoFormat("Found wrong EditPos {0}", mapSnapEditPos.Max(check => check.Value) + 1);
                     var keyList = new List<int>(mapSnapEditPos.Keys);
 
-                    foreach(var keyEelem in keyList)
+                    foreach (var keyEelem in keyList)
                     {
                         if (mapSnapEditPos[keyEelem] > EditMaxPos)
                         {
@@ -568,7 +801,7 @@ namespace SnapTestDocuments
                 var keyValItems = mapEditSnapPos.ToArray();
                 StringBuilder mapTextBuilderES = new StringBuilder();
                 mapTextBuilderES.AppendLine();
-                for ( int keyIndex = 0;  keyIndex < keyValItems.Length; keyIndex++)
+                for (int keyIndex = 0; keyIndex < keyValItems.Length; keyIndex++)
                 {
                     var charText = textEditImage[keyValItems[keyIndex].Key];
                     var chaVal = Char.IsWhiteSpace(charText) ? String.Format("0x{0:X2}", ((byte)charText)) : String.Format("{0}", charText);
@@ -624,7 +857,6 @@ namespace SnapTestDocuments
                     {
                         log.DebugFormat("EditToSnap: Edit Pos just past max character count : {0} from {1}, at:{2}", editPos, CallMethod, LineNumber);
                         snapPos = SnapMaxPos;
-
                     }
                     else
                     {
@@ -660,9 +892,7 @@ namespace SnapTestDocuments
                 }
                 else
                 {
-
                     log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
-                    
                     editPos = snapPos;
                 }
             }
@@ -678,13 +908,13 @@ namespace SnapTestDocuments
                 switch (result)
                 {
                     case 0:
-                    {
-                        return snapField;   // found field in range
-                    }
+                        {
+                            return snapField;   // found field in range
+                        }
                     case -1:
-                    {
-                        return null;        // fields after cursor can be ignored
-                    }
+                        {
+                            return null;        // fields after cursor can be ignored
+                        }
                     default:
                         break;
                 }
@@ -730,9 +960,9 @@ namespace SnapTestDocuments
             return viewBounds.Contains(bounds.Left, bounds.Top) && viewBounds.Contains(bounds.Right, bounds.Bottom);
         }
 
-        public static void ScrollRangeToVisible(SnapControl snapControl, Tuple<int, int> range)
+        public static void ScrollRangeToVisible(SnapControl snapControl, DocumentRange range)
         {
-            Rectangle bounds = snapControl.GetLayoutPhysicalBoundsFromPosition(snapControl.Document.CreatePosition(range.Item1));
+            Rectangle bounds = snapControl.GetLayoutPhysicalBoundsFromPosition(range.Start);
             if (bounds == Rectangle.Empty)
             {
                 log.Debug("Invalid Document Range");
@@ -743,7 +973,29 @@ namespace SnapTestDocuments
             snapControl.VerticalScrollValue = -horizontalDiff;
         }
 
-        public static int getCharLineIndex(string textCharacters, int lineIndex)
+        public Tuple<Field, FieldLocationType> GetNearestFieldFromPosition(ITextEditWinFormsUIContext controlContext, int snapPosition, bool fromEnd = true)
+        {
+            _snapCtrlContext = controlContext;
+            var closestField = this.fieldNodes.GetNearestField(snapPosition, fromEnd);
+            if (PermissionManager.IsDocumentFieldEditable(closestField))
+            {
+                var foundField = closestField.CompareFieldRange(snapPosition);
+                switch (foundField)
+                {
+                    case -1:
+                        return new Tuple<Field, FieldLocationType>(closestField, FieldLocationType.BeforeField);
+                    case 1:
+                        return new Tuple<Field, FieldLocationType>(closestField, FieldLocationType.AfterField);
+                    case 0:
+                    default:
+                        return new Tuple<Field, FieldLocationType>(closestField, FieldLocationType.InsideField);
+
+                }
+            }
+            return null;
+        }
+
+        public static int GetCharLineIndex(string textCharacters, int lineIndex)
         {
             String[] lineparts = textCharacters.Split(new string[] { "\r\n" }, StringSplitOptions.None);
             if (textCharacters.Length <= lineIndex)

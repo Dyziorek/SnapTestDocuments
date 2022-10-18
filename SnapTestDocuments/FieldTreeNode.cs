@@ -11,9 +11,12 @@ namespace SnapTestDocuments
     {
 
         public Field Data { get; set; }
-        public string FieldCode;
 
-        public string FieldTextValue;
+        private Tuple<String, int> FieldPrefix;
+        private Tuple<String, int> FieldText;
+        private Tuple<String, int> FieldSuffix;
+
+        private Tuple<int, int> CoreRange;
         public FieldTreeNode Parent { get; set; }
         private readonly LinkedList<FieldTreeNode> children;
         public ICollection<FieldTreeNode> Children => children;
@@ -36,6 +39,22 @@ namespace SnapTestDocuments
                     return 0;
                 return Parent.Level + 1;
             }
+        }
+
+        public bool IsFieldDirty
+        {
+            get
+            {
+                return !Data.Range.Length.Equals(CoreRange.Item2 - CoreRange.Item2);
+            }
+        }
+
+        public void UpdateField(Tuple<String, int> fieldPrefix, Tuple<String, int> fieldText, Tuple<String, int> fieldSuffix)
+        {
+            CoreRange = new Tuple<int, int>(Data.Range.Start.ToInt(), Data.Range.End.ToInt());
+            FieldPrefix = fieldPrefix ?? FieldPrefix;
+            FieldText = fieldText ?? FieldText;
+            FieldSuffix = fieldSuffix ?? FieldSuffix;
         }
 
         public FieldTreeNode FirstChild
@@ -70,80 +89,26 @@ namespace SnapTestDocuments
             } 
         }
 
-        public FieldTreeNode(Field data, string fieldCode, string textField)
+        public FieldTreeNode(Field data)
         {
             this.Data = data;
-            this.FieldCode = fieldCode;
-            this.FieldTextValue = textField;
             this.children = new LinkedList<FieldTreeNode>();
 
-            //this.ElementsIndex = new LinkedList<FieldTreeNode>();
-            //this.ElementsIndex.Add(this);
+            CoreRange = new Tuple<int, int>(data.Range.Start.ToInt(), data.Range.End.ToInt());
         }
 
-        public FieldTreeNode AddChild(Field child, string fieldCode, string textField)
+        public FieldTreeNode AddChild(Field child)
         {
-            FieldTreeNode childNode = new FieldTreeNode(child, fieldCode, textField) { Parent = this };
+            FieldTreeNode childNode = new FieldTreeNode(child) { Parent = this };
             this.Children.Add(childNode);
-
-            //this.RegisterChildForSearch(childNode);
 
             return childNode;
         }
 
-        public void AddChild(LinkedListNode<Field> indexer, SnapControl control)
+        public void AddChild(LinkedListNode<Field> indexer)
         {
-            string fieldCodeChild = DragonDictationTools.VerifyField(indexer.Value, control);
-            AddChild(indexer.Value, fieldCodeChild, control.Document.GetText(indexer.Value.ResultRange));
+            AddChild(indexer.Value);
         }
-
-        public override string ToString()
-        {
-            if (Children.Count > 0)
-            {
-                StringBuilder fullPack = new StringBuilder();
-                fullPack.Append("(").AppendLine();
-                fullPack.Append(Data != null ? "(" + Data.Range.Start.ToString() + ", " + Data.Range.End.ToString() + ")" + "{" + Data.ResultRange.Start.ToString() + ", " + Data.ResultRange.End.ToString() + "}" : "[data null]");
-                fullPack.Append(",FC:").Append(FieldCode).Append(",FV:").Append(FieldTextValue);
-                foreach(var child in Children)
-                {
-                    fullPack.AppendLine();
-                    fullPack.Append(child.ToString());
-                    fullPack.AppendLine();
-                }
-                fullPack.Append(")").AppendLine();
-                return fullPack.ToString();
-            }
-            else
-            {
-
-                StringBuilder fullPack = new StringBuilder();
-                fullPack.Append(Data != null ? "(" + Data.Range.Start.ToString() + ", " + Data.Range.End.ToString() + ")" + "{" + Data.ResultRange.Start.ToString() + ", " + Data.ResultRange.End.ToString() + "}" : "[data null]");
-                fullPack.Append(",FC:").Append(FieldCode).Append(",FV:").Append(FieldTextValue);
-                return fullPack.ToString();
-            }
-        }
-
-
-        #region searching
-
-        //private ICollection<FieldTreeNode> ElementsIndex { get; set; }
-
-        //private void RegisterChildForSearch(FieldTreeNode node)
-        //{
-        //    ElementsIndex.Add(node);
-        //    if (Parent != null)
-        //        Parent.RegisterChildForSearch(node);
-        //}
-
-        //public FieldTreeNode FindTreeNode(Func<FieldTreeNode, bool> predicate)
-        //{
-        //    return this.ElementsIndex.FirstOrDefault(predicate);
-        //}
-
-        //public int TreeCount { get { return ElementsIndex.Count; } }
-        #endregion
-
 
         #region iterating
 
@@ -160,6 +125,95 @@ namespace SnapTestDocuments
                 foreach (var anyChild in directChild)
                     yield return anyChild;
             }
+        }
+
+        internal IEnumerable<Tuple<string, int>> GetCachedStringData()
+        {
+            if (FieldPrefix != null) 
+                yield return FieldPrefix;
+            if (FieldText != null)
+                yield return FieldText;
+            if (FieldSuffix != null)
+                yield return FieldSuffix;
+        }
+
+
+        internal Field ClosestNeighborNodeField(int referenceLocation, ref int minimalDistance, Field locationField)
+        {
+            if (IsLeaf)
+                return null;
+
+            Field closestField = null;
+            foreach (var childEntry in Children)
+            {
+                int fieldCheckPosition = childEntry.Data.ResultRange.End.ToInt();
+                var distance = Math.Abs(referenceLocation - fieldCheckPosition);
+                if (distance <= minimalDistance)
+                {
+                    closestField = childEntry.Data;
+                    minimalDistance = distance;
+                }
+                var closestChildField = childEntry.ClosestNeighborNodeField(referenceLocation, ref minimalDistance, locationField);
+                if (closestChildField != null)
+                {
+                    closestField = closestChildField;
+                }
+            }
+            return closestField;
+        }
+
+        public Field closestNextField(int selectionPosition, ref int minimalDistance)
+        {
+            if (IsLeaf)
+                return null;
+
+            Field closestField = null;
+            foreach (var childEntry in Children)
+            {
+                int fieldCheckPosition = childEntry.Data.ResultRange.End.ToInt();
+                
+                var distance = Math.Abs(selectionPosition - fieldCheckPosition);
+                if (distance <= minimalDistance && (selectionPosition - fieldCheckPosition) < 0)
+                {
+                    closestField = childEntry.Data;
+                    minimalDistance = distance;
+                }
+                var closestChildField = childEntry.closestNextField(selectionPosition, ref minimalDistance);
+                if (closestChildField != null)
+                {
+                    closestField = closestChildField;
+                }
+            }
+            return closestField;
+        }
+
+
+        public Field closestNodeField(int selectionPosition, ref int minimalDistance, bool fromEnd)
+        {
+            if (IsLeaf)
+                return null;
+
+            Field closestField = null;
+            foreach (var childEntry in Children)
+            {
+                int fieldCheckPosition = childEntry.Data.ResultRange.End.ToInt();
+                if (!fromEnd)
+                {
+                    fieldCheckPosition = childEntry.Data.ResultRange.Start.ToInt();
+                }
+                var distance = Math.Abs(selectionPosition - fieldCheckPosition);
+                if (distance <= minimalDistance)
+                {
+                    closestField = childEntry.Data;
+                    minimalDistance = distance;
+                }
+                var closestChildField = childEntry.closestNodeField(selectionPosition, ref minimalDistance, fromEnd);
+                if (closestChildField != null)
+                {
+                    closestField = closestChildField;
+                }
+            }
+            return closestField;
         }
 
         #endregion

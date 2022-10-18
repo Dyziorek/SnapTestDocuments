@@ -165,6 +165,9 @@
     <Compile Include="ExtTextControl.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="GcmSnapControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="SnapControlForm.cs">
       <SubType>Form</SubType>
     </Compile>

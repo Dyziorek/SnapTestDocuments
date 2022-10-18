@@ -630,6 +630,21 @@ namespace SnapTestDocuments
             return result;
         }
 
+        public static int CompareFieldRange(this Field fld, int caretPos)
+        {
+            if (caretPos < fld.Range.Start.ToInt())
+            {
+                return -1;
+            }
+            else if (caretPos > fld.Range.End.ToInt())
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
+        }
     }
 
 

@@ -14,20 +14,18 @@ using System.Drawing;
 namespace SnapTestDocuments
 {
 
-    public class ExtSnapControl : DevExpress.Snap.SnapControl
+    public class ExtSnapControl : GcmSnapControl
     {
 
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name);
-        private ITextEditWinFormsUIContext _currentContext;
         DragonDictationHelper dictationHelper = new DragonDictationHelper();
         private Tuple<int, int> requestSelectPair = new Tuple<int, int>(-1, -1);  // start, end in snap positions
         private Tuple<int, int> lastSelectionPair = new Tuple<int, int>(-1, -1);  // start, end in snap positions
         private string cachedText;
         private string lastcachedText;
-        private bool fieldTextChanged = false;
-        private Tuple<bool, Field> adjustField = new Tuple<bool, Field>(false, null);
+        private bool dirtyTextMapping = true;
         private int lastTextLength = -1;
-        private static int charSize = Marshal.SizeOf(typeof(tagChar));
+        private static readonly int charSize = Marshal.SizeOf(typeof(tagChar));
         IntPtr hOldFont = IntPtr.Zero;
         IntPtr oldRectPtr = IntPtr.Zero;
         System.Drawing.Rectangle rectData = System.Drawing.Rectangle.Empty;
@@ -53,7 +51,6 @@ namespace SnapTestDocuments
                 Bottom = bottom;
             }
         }
-
         protected override CreateParams CreateParams
         {
             get
@@ -85,14 +82,6 @@ namespace SnapTestDocuments
             }
         }
 
-        public ITextEditWinFormsUIContext SetContext
-        {
-            set
-            {
-                _currentContext = value;
-            }
-        }
-
         private void ReplaceText(string messageText)
         {
             var caretPos = Document.Selection;
@@ -103,9 +92,11 @@ namespace SnapTestDocuments
                 var fieldUpdated = dictationHelper.HandleWorkFieldSelection(_currentContext, fieldCheck, messageText);
                 if (fieldUpdated != null)
                 {
-                    fieldTextChanged = true;
                     fieldProcessed = true;
-                    adjustField = new Tuple<bool, Field>(false, fieldUpdated);
+                    Document.CaretPosition = Document.Selection.End;
+                    ExtSnapControl_ContentChanged(this, EventArgs.Empty);
+                    int updatedCaretPosition = Document.Selection.End.ToInt();
+                    lastSelectionPair = new Tuple<int, int>(updatedCaretPosition, updatedCaretPosition);
                 }
                 caretPos = Document.Selection;
             }
@@ -129,20 +120,51 @@ namespace SnapTestDocuments
                         caretPos = Document.CreateRange(Document.CreatePosition(caretPos.Start.ToInt()), caretPos.Length);
                     }
                 }
-                SubDocument docFragment = caretPos.BeginUpdateDocument();
-                try
+
+                var nearField = dictationHelper.GetNearestFieldFromPosition(_currentContext, caretPos.Start.ToInt());
+                if (nearField.Item1 != null)
                 {
-                    docFragment.BeginUpdate();
-                    docFragment.Replace(caretPos, messageText);
+                    if (Math.Abs(caretPos.Start.ToInt() - nearField.Item1.ResultRange.End.ToInt()) <= 1)
+                    {
+                        var rangeToReplace = nearField.Item1.ResultRange;
+
+                        var subDocumentUpdate = rangeToReplace.BeginUpdateDocument();
+                        try
+                        {
+                            subDocumentUpdate.Replace(rangeToReplace, subDocumentUpdate.GetText(rangeToReplace) + messageText);
+                        }
+                        finally
+                        {
+                            subDocumentUpdate.EndUpdate();
+                            rangeToReplace.EndUpdateDocument(subDocumentUpdate);
+                        }
+                        Document.Selection = Document.CreateRange(rangeToReplace.End, 0);
+                        ExtSnapControl_ContentChanged(this, EventArgs.Empty);
+                        Document.CaretPosition = rangeToReplace.End;
+                        lastSelectionPair = new Tuple<int, int>(rangeToReplace.End.ToInt(), rangeToReplace.End.ToInt());
+                        log.InfoFormat("Appended field text: {1} last selection is:{0}", lastSelectionPair, messageText);
+                        fieldProcessed = true;
+
+                    }
                 }
-                finally
+                if (!fieldProcessed)
                 {
-                    docFragment.EndUpdate();
-                    caretPos.EndUpdateDocument(docFragment);
-                    ExtSnapControl_ContentChanged(this, EventArgs.Empty);
-                    Document.CaretPosition = caretPos.End;
-                    lastSelectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
-                    log.InfoFormat("Replaced text: {1} last selection is:{0}", lastSelectionPair, messageText);
+                    SubDocument docFragment = caretPos.BeginUpdateDocument();
+                    try
+                    {
+                        docFragment.BeginUpdate();
+                        docFragment.Replace(caretPos, messageText);
+                    }
+                    finally
+                    {
+                        docFragment.EndUpdate();
+                        caretPos.EndUpdateDocument(docFragment);
+                        ExtSnapControl_ContentChanged(this, EventArgs.Empty);
+                        Document.CaretPosition = caretPos.End;
+                        lastSelectionPair = new Tuple<int, int>(caretPos.End.ToInt(), caretPos.End.ToInt());
+                        UpdateTextMapping();
+                        log.InfoFormat("Replaced text: {1} last selection is:{0}", lastSelectionPair, messageText);
+                    }
                 }
             }
         }
@@ -167,32 +189,25 @@ namespace SnapTestDocuments
             }
             else
             {
+                if (dirtyTextMapping)
+                {
+                    UpdateTextMapping();
+                }
                 minPos = dictationHelper.EditToSnap(minPos);
                 maxPos = dictationHelper.EditToSnap(maxPos);
                 log.InfoFormat("Mapped setsel orig:{0},{1}, maps{2},{3}", wparam, lparam, minPos, maxPos);
                 if (maxPos == minPos)
                 {
-                    bool adjustedField = false;
-                    
-                    if (adjustField.Item1 && adjustField.Item2 != null && true == (adjustField.Item2 as DevExpress.XtraRichEdit.API.Native.Implementation.NativeField)?.IsValid)
-                    {
-                        var cursorPos = dictationHelper.SnapToEdit(minPos);
-                        var fieldEndPos = dictationHelper.SnapToEdit(adjustField.Item2.Range.End.ToInt());
-                        if (cursorPos - fieldEndPos == 0 || cursorPos - fieldEndPos == 1)
-                        {
-                            this.Document.CaretPosition = Document.CreatePosition(adjustField.Item2.ResultRange.End.ToInt());
-                            adjustedField = true;
-                            adjustField = new Tuple<bool, Field>(false, null);
-                        }
-                    }
-                    if (!adjustedField && !requestSelectPair.Equals(new Tuple<int, int>(minPos, maxPos)))
+                    if (!requestSelectPair.Equals(new Tuple<int, int>(minPos, maxPos)))
                     {
                         Document.BeginUpdate();
                         var docCharPos = Document.CreatePosition(minPos);
                         var rectObj = GetBoundsFromPosition(docCharPos);
                         rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
                         Document.CaretPosition = docCharPos;
-                        if (rectObj == System.Drawing.Rectangle.Empty || !ClientRectangle.Contains(rectObj.X, rectObj.Y))
+                        var clientRect = ClientRectangle;
+                        clientRect.Inflate(0, Convert.ToInt32(-clientRect.Height * 0.05));
+                        if (rectObj == System.Drawing.Rectangle.Empty || !clientRect.Contains(rectObj.X, rectObj.Y))
                         {
                             ScrollToCaret();
                         }
@@ -207,7 +222,9 @@ namespace SnapTestDocuments
                         var docCharPos = Document.CreatePosition(minPos);
                         var rectObj = GetBoundsFromPosition(docCharPos);
                         rectObj = DevExpress.Office.Utils.Units.DocumentsToPixels(rectObj, DpiX, DpiY);
-                        if (rectObj == System.Drawing.Rectangle.Empty || !ClientRectangle.Contains(rectObj.X, rectObj.Y))
+                        var clientRect = ClientRectangle;
+                        clientRect.Inflate(0, Convert.ToInt32(-clientRect.Height * 0.05));
+                        if (rectObj == System.Drawing.Rectangle.Empty || !clientRect.Contains(rectObj.X, rectObj.Y))
                         {
                             Document.CaretPosition = docCharPos;
                             ScrollToCaret();
@@ -253,6 +270,10 @@ namespace SnapTestDocuments
                         }
                         else
                         {
+                            if (dirtyTextMapping)
+                            {
+                                UpdateTextMapping();
+                            }
                             lastCaretPos = new Tuple<int, int>(dictationHelper.SnapToEdit(lastSelectionPair.Item1), dictationHelper.SnapToEdit(lastSelectionPair.Item2));
                         }
 
@@ -272,7 +293,7 @@ namespace SnapTestDocuments
                         {
                             lastCaretPos = new Tuple<int, int>(lastCaretPos.Item1, 65535 - lastCaretPos.Item1);
                         }
-                        Int32 retVal = lastCaretPos.Item1 & 0xffff | ((lastCaretPos.Item2 & 0xffff) << 16);
+                        Int32 retVal = Convert.ToInt16(lastCaretPos.Item1) + (Convert.ToInt16(lastCaretPos.Item2) << 16);
                         m.Result = (IntPtr)retVal;
                         log.DebugFormat("Get Selection: from:{0}, to:{1} - ret:{2:X8}", Marshal.ReadInt32(m.WParam), Marshal.ReadInt32(m.LParam), (int)m.Result);
                     }
@@ -402,7 +423,7 @@ namespace SnapTestDocuments
                     m.Result = (IntPtr)(-1);
                     if ((int)m.WParam >= 0)
                     {
-                        System.Drawing.Rectangle rectObj = new System.Drawing.Rectangle();
+                        Rectangle rectObj = new System.Drawing.Rectangle();
 
                         if (_currentContext?.GetManager<IDragonAccessManager>() != null)
                         {
@@ -422,6 +443,10 @@ namespace SnapTestDocuments
                         }
                         else
                         {
+                            if (dirtyTextMapping)
+                            {
+                                UpdateTextMapping();
+                            }
                             int charPosition = dictationHelper.EditToSnap((int)m.WParam);
                             if (Document.Range.Length > charPosition)
                             {
@@ -499,7 +524,7 @@ namespace SnapTestDocuments
                         }
                         if (textBuff != null)
                         {
-                            m.Result = (IntPtr)DragonDictationHelper.getCharLineIndex(textBuff, lineIndex);
+                            m.Result = (IntPtr)DragonDictationHelper.GetCharLineIndex(textBuff, lineIndex);
                             if (log.IsInfoEnabled)
                             {
                                 log.InfoFormat("Line Pos from Point  C:{0},Line:{1}", lineIndex, (int)m.Result);
@@ -612,32 +637,33 @@ namespace SnapTestDocuments
             if (_currentContext?.GetManager<IDragonAccessManager>() == null)
             {
                 cachedText = Text;
-                if (fieldTextChanged)
-                {
-                    adjustField = new Tuple<bool, Field>(true, adjustField.Item2);
-                }
-                else
-                {
-                    adjustField = new Tuple<bool, Field>(false, null);
-                }
                 if (Document.Fields?.Count > 0)
                 {
-                    var paragraphs = Document.Paragraphs.Get(Document.Range);
-                    var paragraphPositions = new List<int>();
-                    foreach (var parItem in paragraphs)
-                    {
-                        paragraphPositions.Add(parItem.Range.End.ToInt());
-                    }
-                    dictationHelper.AnalyzeTextSection(this, Document.Range, cachedText, paragraphPositions);
+                    dirtyTextMapping = true;
                 }
                 else
                 {
+                    dictationHelper.ResetMappings();
                     dictationHelper.MapTextPositions(cachedText);
                 }
                 log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
             }
         }
 
+        private void UpdateTextMapping()
+        {
+            if (Document.Fields?.Count > 0)
+            {
+                var paragraphs = Document.Paragraphs.Get(Document.Range);
+                var paragraphPositions = new List<int>();
+                foreach (var parItem in paragraphs)
+                {
+                    paragraphPositions.Add(parItem.Range.End.ToInt());
+                }
+                dictationHelper.AnalyzeTextSection(_currentContext, this, Document.Range, cachedText, paragraphPositions, lastSelectionPair);
+            }
+            dirtyTextMapping = false;
+        }
 
     }
 }
