@@ -36,4 +36,6 @@ public:
 	afx_msg void OnBnClickedButton2();
 	int textLength = 0;
 	HWND GetWindowHandle();
+	CString ClassNameVal;
+	afx_msg void OnBnClickedButton3();
 };

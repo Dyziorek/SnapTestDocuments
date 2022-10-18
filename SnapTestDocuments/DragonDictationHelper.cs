@@ -44,11 +44,6 @@ namespace SnapTestDocuments
 
     public static class DragonDictationTools
     {
-        public static bool IsNotNullSelection(this Tuple<int, int> firstOperand)
-        {
-            return !firstOperand.Equals(new Tuple<int, int>(-1, -1));
-        }
-
         public static int SnapLengthText(this StringBuilder textSection)
         {
             var countLines = textSection.ToString().Count( varCheck => {
@@ -78,11 +73,14 @@ namespace SnapTestDocuments
             }
         }
 
-        public static void ArrangeFields(this List<FieldTreeNode> baseFields, FieldLinkedList fields, SnapControl control)
+        public static void ArrangeFields(this List<FieldTreeNode> baseFields, FieldLinkedList fields, SnapControl control, log4net.ILog log)
         {
             var fieldElem = fields.First;
-
-            string fieldCode = VerifyField(fieldElem.Value, control);
+            string fieldCode = "(AnyField)";
+            if (log.IsDebugEnabled)
+            {
+                fieldCode = VerifyField(fieldElem.Value, control);
+            }
             baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCode, control.Document.GetText(fieldElem.Value.ResultRange )));
             while (fieldElem.Next != null)
             {
@@ -111,15 +109,12 @@ namespace SnapTestDocuments
                     
                     if (!found)
                     {
-                        string fieldCodeChild = VerifyField(fieldElem.Value, control);
-                        if (fieldCodeChild != null)
+                        string fieldCodeChild = "(AnyChildField)";
+                        if (log.IsDebugEnabled)
                         {
-                            baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCodeChild, control.Document.GetText(fieldElem.Value.ResultRange)));
+                            fieldCodeChild = VerifyField(fieldElem.Value, control);
                         }
-                        else
-                        {
-                            baseFields.Add(new FieldTreeNode(fieldElem.Value, "GetTextCall:" + control.Document.GetText(fieldElem.Value.CodeRange), control.Document.GetText(fieldElem.Value.ResultRange)));
-                        }
+                        baseFields.Add(new FieldTreeNode(fieldElem.Value, fieldCodeChild, control.Document.GetText(fieldElem.Value.ResultRange)));
                     }
                 }
                 else
@@ -171,17 +166,6 @@ namespace SnapTestDocuments
             }
             return "Unknown field";
         }
-
-        //public static int WholeCount(this List<FieldTreeNode> fieldTrees)
-        //{
-        //    int wholeSum = 1;
-        //    var counter = fieldTrees.GetEnumerator();
-        //    while (counter.MoveNext())
-        //    {
-        //        wholeSum += counter.Current.TreeCount;
-        //    }
-        //    return wholeSum;
-        //}
     }
 
     class DragonDictationHelper
@@ -237,105 +221,11 @@ namespace SnapTestDocuments
                     //selection needs to be removed
                     _snapCtrlContext.Document.Selection = subDocument.CreateRange(FieldCheck.ResultRange.Start, 0);
 
-                    //caret position does NOT need to be set
-                    //this.snapCtrl.Document.CaretPosition = fieldsCol[0].ResultRange.Start;
-
-                    //if (EmptyMergeFieldCharacterPropertiesMgr != null)
-                    //    FontTools.ReplaceFontPropertiesForField(_snapCtrlContext.Document, FieldCheck, _snapCtrlContext.Document.CaretPosition, EmptyMergeFieldCharacterPropertiesMgr, _snapCtrlContext.IsSetup);
-
-                    //Not neeeded - Key should be normally handled by the Snap Control
-                    //snapSubDocument.InsertText(fieldsCol[0].ResultRange.Start, chr.ToString());
                     return FieldCheck;
                 }
             }
             return null;
         }
-
-        public bool AnalyzeTextSectionOld(SnapControl control, DocumentRange sectionPart, IEnumerable<int> paragraphsCollection)
-        {
-             var sectionRange = sectionPart;
-            var fieldRange = SnapFieldTools.GetFieldsInRange(control.Document, sectionRange).ToList();
-            var paragraphPositions = paragraphsCollection.ToList();
-
-            var ll = paragraphPositions.Select(Call => new Tuple<int, int>(Call, Call));
-            fieldRange.Sort((field1, field2) => field1.ResultRange.Start.ToInt().CompareTo(field2.ResultRange.Start.ToInt()));
-            List<FieldTreeNode> fieldNodes = new List<FieldTreeNode>();
-            
-
-
-            var allEntities = new FieldLinkedList(fieldRange);
-            if (allEntities.Count() > 0)
-            {
-                // document contains edit fields
-                fieldNodes.ArrangeFields(allEntities, control);
-                var stringParts = new List<Tuple<string, int>>();
-                int initialRange = sectionRange.Start.ToInt();
-                var fieldData = allEntities.First;
-                while (fieldData.Next != null)
-                {
-                    // text before field
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
-                    if (paragraphPositions.Exists(condition => condition == fieldData.Value.Range.Start.ToInt()))
-                    {
-                        var lastElement = stringParts.Last();
-                        stringParts[stringParts.Count - 1] = new Tuple<string, int>(lastElement.Item1 + "\r\n", lastElement.Item2);
-                    }
-                    if (fieldData.Next.Value.Range.Start.ToInt() < fieldData.Value.ResultRange.End.ToInt())
-                    {
-                        // text in field to nested field
-                        stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldData.Value.ResultRange.Start.ToInt(),
-                            fieldData.Next.Value.Range.Start.ToInt() - fieldData.Value.ResultRange.Start.ToInt())), 0));
-                        initialRange = fieldData.Next.Value.Range.Start.ToInt();
-                    }
-                    else
-                    {
-                        // text in field
-                        stringParts.Add(new Tuple<string, int>(control.Document.GetText(fieldData.Value.ResultRange), 1));
-                        initialRange = fieldData.Value.Range.End.ToInt();
-                    }
-                    fieldData = fieldData.Next;
-                }
-                if (fieldData.Value.Range.Start.ToInt() >= initialRange)
-                {
-                    // last field - text before
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldData.Value.Range.Start.ToInt() - initialRange)), fieldData.Value.CodeRange.Length + 2));
-                    if (paragraphPositions.Exists(condition => condition == fieldData.Value.Range.Start.ToInt()))
-                    {
-                        var lastElement = stringParts.Last();
-                        stringParts[stringParts.Count - 1] = new Tuple<string, int>(lastElement.Item1 + "\r\n", lastElement.Item2);
-                    }
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(fieldData.Value.ResultRange), 1));
-                    initialRange = fieldData.Value.Range.End.ToInt();
-                }
-                var fieldinRange = allEntities.Where(checker => checker.ResultRange.Start.ToInt() <= initialRange && checker.ResultRange.End.ToInt() >= initialRange);
-                if (fieldinRange.Count() == 1)
-                {
-                    var lastPartRange = control.Document.CreateRange(initialRange, fieldinRange.First().ResultRange.End.ToInt() - initialRange);
-                    string partialTexts = control.Document.GetText(lastPartRange);
-                    stringParts.Add(new Tuple<string, int>(partialTexts, 1));
-                    lastPartRange = control.Document.CreateRange(fieldinRange.First().Range.End.ToInt(), sectionRange.End.ToInt() - fieldinRange.First().Range.End.ToInt());
-                    partialTexts = control.Document.GetText(lastPartRange);
-                    stringParts.Add(new Tuple<string, int>(partialTexts, 0));
-                }
-                else
-                {
-                    var lastPartRange = control.Document.CreateRange(initialRange, sectionRange.End.ToInt() - initialRange);
-                    stringParts.Add(new Tuple<string, int>(control.Document.GetText(lastPartRange), 0));
-                }
-                log.InfoFormat("String parts count:{0}", stringParts.Count);
-                if (log.IsInfoEnabled)
-                {
-                    for (int index = 0; index < stringParts.Count; index++)
-                    {
-                        log.InfoFormat("Part {0} Elements '{1}' , {2}", index, stringParts[index].Item1, stringParts[index].Item2);
-                    }
-                }
-                MapTextPositions(stringParts, paragraphPositions, "",  control, sectionPart.Start.ToInt());
-                return true;
-            }
-            return false;
-        }
-
 
         public bool AnalyzeTextSection(SnapControl control, DocumentRange sectionPart, string sectionText,  IEnumerable<int> paragraphsCollection)
         {
@@ -348,7 +238,7 @@ namespace SnapTestDocuments
             if (fieldRange.Count() > 0)
             {
                 // document contains edit fields
-                fieldNodes.ArrangeFields(new FieldLinkedList(fieldRange), control);
+                fieldNodes.ArrangeFields(new FieldLinkedList(fieldRange), control, log);
                 var stringParts = new List<Tuple<string, int>>();
                 int initialRange = sectionRange.Start.ToInt();
                 foreach (var fieldElement in fieldNodes)
@@ -390,9 +280,6 @@ namespace SnapTestDocuments
                         log.InfoFormat("Part {0} Elements '{1}' , {2}", index, stringParts[index].Item1, stringParts[index].Item2);
                     }
                 }
-
-                
-
                 return MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
             }
             return false;
@@ -400,15 +287,7 @@ namespace SnapTestDocuments
 
         private void AnalyzeNestedFields(SnapControl control, FieldTreeNode fieldElement, ref int initialRange, List<Tuple<string, int>> stringParts)
         {
-            // first check if current field has resultRange text before first nested field
-            //if (fieldElement.Data.ResultRange.Start < fieldElement.FirstChild.Data.ResultRange.Start)
-            //{
-
-            //    stringParts.Add(new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(fieldElement.Data.ResultRange.Start.ToInt(),
-            //                fieldElement.FirstChild.Data.Range.Start.ToInt() - fieldElement.Data.ResultRange.Start.ToInt())), 0));
-            //    initialRange = fieldElement.FirstChild.Data.Range.Start.ToInt();
-            //}
-
+            
             foreach (var childItem in fieldElement.Children)
             {
                 if (!childItem.IsLeaf)
@@ -649,9 +528,6 @@ namespace SnapTestDocuments
             }
 
 
-            //StringBuilder textBuilder = new StringBuilder();
-
-            //textSections.ForEach(textPart => textBuilder.Append(textPart.Item1));
             textEditImage = textBuilder.ToString();
             
             int compOP = texControl.CompareTo(textEditImage);
@@ -660,20 +536,21 @@ namespace SnapTestDocuments
                 log.InfoFormat("Comparsion sectionText:'{0}'  textParts:'{1}' - result {2}", texControl, textEditImage, compOP);
                 log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textImageSize, texControl.Length, EditMaxPos );
                 
-            }    
-
-            if (textEditImage.Length < EditMaxPos + 1)
-            {
-                textEditImage = textEditImage.PadRight(EditMaxPos+1, '`');
             }
 
-            if (texControl.Length < EditMaxPos + 1)
+            if (log.IsDebugEnabled)
             {
-                texControl = texControl.PadRight(EditMaxPos + 1, '`');
-            }
+                // this is very slow debug diagnostics code, use this only for error investigation
+                if (textEditImage.Length < EditMaxPos + 1)
+                {
+                    textEditImage = textEditImage.PadRight(EditMaxPos+1, '`');
+                }
 
-            if (log.IsInfoEnabled && textSections.Count < 20)
-            {
+                if (texControl.Length < EditMaxPos + 1)
+                {
+                    texControl = texControl.PadRight(EditMaxPos + 1, '`');
+                }
+
                 if (mapSnapEditPos.Max(check => check.Value) + 1 > EditMaxPos)
                 {
                     log.InfoFormat("Found wrong EditPos {0}", mapSnapEditPos.Max(check => check.Value) + 1);
@@ -757,11 +634,7 @@ namespace SnapTestDocuments
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                    {
-                        log.DebugFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
-                    }
-                    snapPos = editPos;
+                    log.DebugFormat("EditToSnap: Unable get Snap position from Edit : {0} called from {1}, at:{2}", editPos, CallMethod, LineNumber);
                 }
             }
             return snapPos;
@@ -787,10 +660,8 @@ namespace SnapTestDocuments
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                    {
-                       log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
-                    }
+
+                    log.DebugFormat("SnapToEdit: Unable get Edit position from Snap: {0} called from: {1}, at:{2}", snapPos, CallMethod, LineNumber);
                     
                     editPos = snapPos;
                 }

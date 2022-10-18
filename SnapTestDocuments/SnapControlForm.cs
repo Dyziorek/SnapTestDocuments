@@ -8,6 +8,7 @@ using System.Text;
 using System.Windows.Forms;
 using System.Xml.Linq;
 using DevExpress.Snap;
+using DevExpress.XtraRichEdit.Export;
 using DevExpress.XtraRichEdit.Services;
 using log4net;
 using log4net.Appender;
@@ -68,11 +69,11 @@ namespace SnapTestDocuments
                 textBox1.Text = openFileDialog1.FileName;
 
                 
-                if (textBox1.Text.Contains("snx"))
+                if (textBox1.Text.Contains(".snx"))
                 {
                     success = snapControl2.LoadDocument(textBox1.Text);
                 }
-                else if (textBox1.Text.Contains("rtf"))
+                else if (textBox1.Text.Contains(".rtf"))
                 {
                     success = snapControl2.LoadDocument(textBox1.Text, DevExpress.XtraRichEdit.DocumentFormat.Rtf);
                 }
@@ -93,12 +94,12 @@ namespace SnapTestDocuments
                 }
                 lbSections.Items.Clear();
             }
-            if (success && textBox1.Text.Contains("snx"))
+            if (success && textBox1.Text.Contains(".snx"))
             {
                 XDocument snDocument = GetDocumentFromPackage(memoryStream);
                 FilTreeView(snDocument);
             }
-            else if (textBox1.Text.Contains("rtf"))
+            else if (textBox1.Text.Contains(".rtf"))
             {
                 textBox2.Text = string.Format("Loaded RTF : {0} path {1}", success, textBox1.Text);
             }
@@ -124,7 +125,41 @@ namespace SnapTestDocuments
 
         private void BtnSaveDoc_Click(object sender, EventArgs e)
         {
-            snapControl2.SaveDocumentAs();
+
+            SaveFileDialog saveFile = new SaveFileDialog();
+            saveFile.Filter = "snx files (*.snx)|*.snx|rtf files (*.rtf)|*.rtf|All files (*.*)|*.*";
+            if (saveFile.ShowDialog() == DialogResult.OK)
+            {
+                if (saveFile.FileName.Contains(".rtf"))
+                {
+                    RtfDocumentExporterOptions options = new RtfDocumentExporterOptions();
+                    options.ExportTheme = false;
+                    var strRTF = snapControl2.Document.GetRtfText(snapControl2.Document.Range, options);
+
+                    {
+                        var dataStrm = System.IO.File.Create(saveFile.FileName);
+                        var data = System.Text.ASCIIEncoding.ASCII.GetBytes(strRTF);
+                        dataStrm.Write(data, 0, data.Length);
+                        dataStrm.Close();
+                    }
+                }
+                else
+                {
+                    snapControl2.SaveDocument(saveFile.FileName);
+                }
+            }
+            //RtfDocumentExporterOptions options = new RtfDocumentExporterOptions();
+            //options.ExportTheme = false;
+            //var strRTF = snapControl2.Document.GetRtfText(snapControl2.Document.Range, options);
+
+            //{
+            //    var dataStrm = System.IO.File.Create(saveFile.FileName);
+            //    var data = System.Text.ASCIIEncoding.ASCII.GetBytes(strRTF);
+            //    dataStrm.Write(data, 0, data.Length);
+            //    dataStrm.Close();
+            //}
+
+           // snapControl2.SaveDocumentAs();
 
         }
 

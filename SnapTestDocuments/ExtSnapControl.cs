@@ -14,20 +14,6 @@ using System.Drawing;
 namespace SnapTestDocuments
 {
 
-    //public class QString
-    //{
-    //    public String Text { get; set; }
-    //    public QString(string member)
-    //    {
-    //        Text = member;
-    //    }
-
-    //    public override string ToString()
-    //    {
-
-    //    }
-    //}
-
     public class ExtSnapControl : DevExpress.Snap.SnapControl
     {
 
@@ -67,7 +53,6 @@ namespace SnapTestDocuments
                 Bottom = bottom;
             }
         }
-
 
         protected override CreateParams CreateParams
         {
@@ -624,8 +609,6 @@ namespace SnapTestDocuments
 
         private void ExtSnapControl_ContentChanged(object sender, EventArgs e)
         {
-            //var textOpts = new DevExpress.XtraRichEdit.Export.PlainTextDocumentExporterOptions();
-            //textOpts.ExportFinalParagraphMark = DevExpress.XtraRichEdit.Export.PlainText.ExportFinalParagraphMark.Always;
             if (_currentContext?.GetManager<IDragonAccessManager>() == null)
             {
                 cachedText = Text;
@@ -639,26 +622,6 @@ namespace SnapTestDocuments
                 }
                 if (Document.Fields?.Count > 0)
                 {
-                    //var paragraphs = Document.Paragraphs;
-                    //var paragraphPositions = new List<int>();
-                    //foreach (var parItem in paragraphs)
-                    //{
-                    //    paragraphPositions.Add(parItem.Range.End.ToInt());
-                    //}
-
-                    //var stringParts = new List<Tuple<string, int>>();
-                    //int initialRange = Document.Range.Start.ToInt();
-                    //foreach (var fieldData in Document.Fields)
-                    //{
-                    //    if (fieldData.Range.Start.ToInt() > initialRange)
-                    //    {
-                    //        stringParts.Add(new Tuple<string, int>(Document.GetText(Document.CreateRange(initialRange, fieldData.Range.Start.ToInt() - initialRange)), fieldData.CodeRange.Length + 2));
-                    //        stringParts.Add(new Tuple<string, int>(Document.GetText(fieldData.ResultRange), 1));
-                    //        initialRange = fieldData.Range.End.ToInt();
-                    //    }
-                    //}
-                    //stringParts.Add(new Tuple<string, int>((Document.GetText(Document.CreateRange(initialRange, Document.Range.End.ToInt() - initialRange))), 0));
-                    //dictationHelper.MapTextPositions(stringParts, paragraphPositions);
                     var paragraphs = Document.Paragraphs.Get(Document.Range);
                     var paragraphPositions = new List<int>();
                     foreach (var parItem in paragraphs)
@@ -672,10 +635,6 @@ namespace SnapTestDocuments
                     dictationHelper.MapTextPositions(cachedText);
                 }
                 log.InfoFormat("SnapControl_ContentChanged - retrieved text with option: '{0}'", cachedText);
-
-
-
-                
             }
         }
 

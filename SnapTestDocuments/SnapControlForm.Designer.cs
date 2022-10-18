@@ -224,10 +224,10 @@ namespace SnapTestDocuments
             this.button1.UseVisualStyleBackColor = true;
             this.button1.Click += new System.EventHandler(this.buttonLog_Click);
             // 
-            // buttonDumo
+            // buttonDump
             // 
             this.buttonDump.Location = new System.Drawing.Point(840, 118);
-            this.buttonDump.Name = "buttonDumo";
+            this.buttonDump.Name = "buttonDump";
             this.buttonDump.Size = new System.Drawing.Size(90, 23);
             this.buttonDump.TabIndex = 6;
             this.buttonDump.Text = "Log Dump";

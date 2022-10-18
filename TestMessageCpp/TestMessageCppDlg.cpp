@@ -55,6 +55,7 @@ END_MESSAGE_MAP()
 
 CTestMessageCppDlg::CTestMessageCppDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_TESTMESSAGECPP_DIALOG, pParent)
+	, ClassNameVal(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -62,6 +63,7 @@ CTestMessageCppDlg::CTestMessageCppDlg(CWnd* pParent /*=nullptr*/)
 void CTestMessageCppDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_Text(pDX, IDC_WNDCLASSNAME, ClassNameVal);
 }
 
 BEGIN_MESSAGE_MAP(CTestMessageCppDlg, CDialogEx)
@@ -70,6 +72,7 @@ BEGIN_MESSAGE_MAP(CTestMessageCppDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON1, &CTestMessageCppDlg::OnBnClickedButton1)
 	ON_BN_CLICKED(IDC_BUTTON2, &CTestMessageCppDlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON3, &CTestMessageCppDlg::OnBnClickedButton3)
 END_MESSAGE_MAP()
 
 
@@ -105,7 +108,8 @@ BOOL CTestMessageCppDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
-
+	this->ClassNameVal = _T("WindowsForms10.Window.8.app.0.2386859_r7_ad1");
+	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -162,22 +166,21 @@ HCURSOR CTestMessageCppDlg::OnQueryDragIcon()
 
 void CTestMessageCppDlg::OnBnClickedButton1()
 {
-	
+	UpdateData(TRUE);
 	CWnd* hwnd = CWnd::FromHandle(GetWindowHandle());
 	if (hwnd != nullptr)
 	{
 		{
 			std::vector<wchar_t> charArray;
-			charArray.resize(textLength, 0);
+			charArray.resize(textLength + sizeof(wchar_t) * 1, 0);
 
 			auto textLen = hwnd->SendMessage(WM_GETTEXT, sizeof(wchar_t) * textLength, (LPARAM)charArray.data());
 
 			CString textReturn;
 			textReturn.Format(_T("TextLen From Get: %d"), textLen);
 			SetDlgItemText(IDC_TEXTLEN, textReturn);
-			std::vector<wchar_t> retText(charArray.begin(), charArray.begin() + 40);
-			retText.push_back(0);
-			SetDlgItemText(IDC_TEXTDATA, retText.data());
+			//std::vector<wchar_t> retText(charArray.begin(), charArray.end());
+			SetDlgItemText(IDC_TEXTDATA, charArray.data());
 			OutputDebugString(charArray.data());
 			OutputDebugString(_T("\r\n"));
 		}
@@ -190,12 +193,25 @@ BOOL CALLBACK THISWNDENUMPROC(HWND checkWindow, LPARAM paramINFO)
 	std::wstring strClassNameText;
 	strClassNameText.resize(255);
 
-	std::pair<const wchar_t*, int>* pairCheck = static_cast<std::pair<const wchar_t*, int>*>((void*)paramINFO);
+	std::wstring strWindowNameText;
+	strWindowNameText.resize(255);
+
+
+	std::tuple<const wchar_t*, const wchar_t*, int, int>* pairCheck = static_cast<std::tuple<const wchar_t*, const wchar_t*, int, int>*>((void*)paramINFO);
 	GetClassName(checkWindow, strClassNameText.data(), 255);
 
-	if (strClassNameText.find(pairCheck->first) != std::wstring::npos)
+	GetWindowText(checkWindow, strWindowNameText.data(), 255);
+
+
+	if (strWindowNameText.find(std::get<1>(*pairCheck)) != std::wstring::npos)
 	{
-		pairCheck->second = (int)checkWindow;
+		std::get<3>(*pairCheck) = (int)1;
+		return true;
+	}
+
+	if (strClassNameText.find(std::get<0>(*pairCheck)) != std::wstring::npos && std::get<3>(*pairCheck) == 1)
+	{
+		std::get<2>(*pairCheck) = (int)checkWindow;
 		return false;
 	}
 
@@ -208,15 +224,34 @@ BOOL CALLBACK THISENUMPROC(HWND testWindow, LPARAM paramInfo)
 {
 	std::wstring strClassNameText;
 	strClassNameText.resize(255);
-	std::pair<const wchar_t*, int>* pairCheck = static_cast<std::pair<const wchar_t*, int>*>((void*)paramInfo);
+	std::wstring strAppNameText;
+	strAppNameText.resize(255);
+	std::wstring classNameParam;
+	std::wstring appNameParam;
+	int handle;
+	std::tuple<const wchar_t*, const wchar_t*, int>* pairCheck = static_cast<std::tuple<const wchar_t*, const wchar_t*, int>*>((void*)paramInfo);
+	classNameParam = std::get<0>(*pairCheck);
+	appNameParam = std::get<1>(*pairCheck);
+	handle = std::get<2>(*pairCheck);
 	GetClassName(testWindow, strClassNameText.data(), 255);
-	if (strClassNameText.find(pairCheck->first) != std::wstring::npos)
+	GetWindowText(testWindow, strAppNameText.data(), 255);
+	if (strClassNameText.find(classNameParam) != std::wstring::npos && strAppNameText.find(appNameParam) != std::wstring::npos)
 	{
-		auto pairWork = std::make_pair(_T("WindowsForms10.EDIT.app.0.13965fa_r6_ad1"), 0);
+		std::wstring what = _T("WindowsForms10.Window.8");
+		std::wstring inout = strClassNameText;
+		std::wstring with = _T("WindowsForms10.EDIT");
+		std::size_t count{};
+		for (std::string::size_type pos{};
+			inout.npos != (pos = inout.find(what.data(), pos, what.length()));
+			pos += with.length(), ++count) {
+			inout.replace(pos, what.length(), with.data(), with.length());
+		}
+
+		auto pairWork = std::make_tuple(inout.data(), _T("Report Sign Out"), 0, 0);
 		bool result = EnumChildWindows(testWindow, THISWNDENUMPROC, (LPARAM)&pairWork);
-		if (pairWork.second != 0)
+		if (std::get<2>(pairWork) != 0)
 		{
-			pairCheck->second = pairWork.second;
+			std::get<2>(*pairCheck) = std::get<2>(pairWork);
 			return false;
 		}
 	}
@@ -227,7 +262,7 @@ BOOL CALLBACK THISENUMPROC(HWND testWindow, LPARAM paramInfo)
 
 void CTestMessageCppDlg::OnBnClickedButton2()
 {
-
+	UpdateData(TRUE);
 	
 		//"WindowsForms10.EDIT.app.0.13965fa_r6_ad1"
 	HWND winHandle = GetWindowHandle();
@@ -258,10 +293,16 @@ void CTestMessageCppDlg::OnBnClickedButton2()
 
 HWND CTestMessageCppDlg::GetWindowHandle()
 {
-	auto pairWork = std::make_pair(_T("WindowsForms10.Window.8.app.0.13965fa_r6_ad1"), 0);
-	bool windSerach = EnumWindows(THISENUMPROC, (LPARAM)&pairWork);
-	if (pairWork.second != 0)
-		return (HWND)pairWork.second;
+	auto tripleWork = std::make_tuple(ClassNameVal,_T("SoftPathologyDx"), 0);
+	bool windSerach = EnumWindows(THISENUMPROC, (LPARAM)&tripleWork);
+	if (std::get<2>(tripleWork) != 0)
+		return (HWND)std::get<2>(tripleWork);
 
 	return (HWND)0;
+}
+
+
+void CTestMessageCppDlg::OnBnClickedButton3()
+{
+	UpdateData(TRUE);
 }
