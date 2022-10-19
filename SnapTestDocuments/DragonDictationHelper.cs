@@ -93,20 +93,20 @@ namespace SnapTestDocuments
             return null;
         }
 
-        public static Field GetNextField(this List<FieldTreeNode> localFields, Field checkingField)
+        public static FieldTreeNode GetNextNodeField(this List<FieldTreeNode> localFields, FieldTreeNode checkingField)
         {
             int minimalDistance = int.MaxValue;
-            Field closestField = null;
-            int selectionPosition = checkingField.ResultRange.End.ToInt();
+            FieldTreeNode closestField = null;
+            int selectionPosition = checkingField.Data.ResultRange.End.ToInt();
             foreach (FieldTreeNode fieldLook in localFields)
             {
                 int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
                 var distance = Math.Abs(selectionPosition - fieldCheckPosition);
                 if (distance < minimalDistance && (selectionPosition - fieldCheckPosition) < 0)
                 {
-                    closestField = fieldLook.Data;
+                    closestField = fieldLook;
                     minimalDistance = distance;
-                    var childField = fieldLook.closestNextField(selectionPosition, ref minimalDistance);
+                    var childField = fieldLook.closestNextNodeField(selectionPosition, ref minimalDistance);
                     if (childField != null)
                     {
                         closestField = childField;
@@ -117,7 +117,7 @@ namespace SnapTestDocuments
             return closestField;
         }
 
-        public static Field GetPreviousField(this List<FieldTreeNode> localFields, Field checkingField)
+        public static FieldTreeNode GetPreviousNodeField(this List<FieldTreeNode> localFields, FieldTreeNode checkingField)
         {
             if (localFields.First().Data.Equals(checkingField))
             {
@@ -125,15 +125,15 @@ namespace SnapTestDocuments
             }
 
             int minimalDistance = int.MaxValue;
-            Field closestField = null;
-            int selectionPosition = checkingField.ResultRange.End.ToInt();
+            FieldTreeNode closestField = null;
+            int selectionPosition = checkingField.Data.ResultRange.End.ToInt();
             foreach (FieldTreeNode fieldLook in localFields)
             {
                 int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
                 var distance = Math.Abs(selectionPosition - fieldCheckPosition);
                 if (distance < minimalDistance && !fieldLook.Data.Equals(checkingField))
                 {
-                    closestField = fieldLook.Data;
+                    closestField = fieldLook;
                     minimalDistance = distance;
                     var childField = fieldLook.closestNodeField(selectionPosition, ref minimalDistance, true);
                     if (childField != null)
@@ -150,10 +150,10 @@ namespace SnapTestDocuments
             return closestField;
         }
 
-        public static Field GetNearestField(this List<FieldTreeNode> localFields, int selectionPosition, bool fromEnd)
+        public static FieldTreeNode GetNearestNodeField(this List<FieldTreeNode> localFields, int selectionPosition, bool fromEnd)
         {
             int minimalDistance = int.MaxValue;
-            Field closestField = null;
+            FieldTreeNode closestField = null;
             foreach (FieldTreeNode fieldLook in localFields)
             {
                 int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
@@ -164,7 +164,7 @@ namespace SnapTestDocuments
                 var distance = Math.Abs(selectionPosition - fieldCheckPosition);
                 if (distance < minimalDistance)
                 {
-                    closestField = fieldLook.Data;
+                    closestField = fieldLook;
                     minimalDistance = distance;
                     var childField = fieldLook.closestNodeField(selectionPosition, ref minimalDistance, fromEnd);
                     if (childField != null)
@@ -181,18 +181,18 @@ namespace SnapTestDocuments
             return closestField;
         }
 
-        public static Field GetNeighborField(this List<FieldTreeNode> fields, Field locationField)
+        public static FieldTreeNode GetNeighborField(this List<FieldTreeNode> fields, Field locationField)
         {
             int minimalDistance = int.MaxValue;
             int referenceLocation = locationField.ResultRange.End.ToInt();
-            Field closestField = null;
+            FieldTreeNode closestField = null;
             foreach (FieldTreeNode fieldLook in fields)
             {
                 int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
                 var distance = Math.Abs(referenceLocation - fieldCheckPosition);
                 if (distance < minimalDistance && !fieldLook.Data.Equals(locationField))
                 {
-                    closestField = fieldLook.Data;
+                    closestField = fieldLook;
                     minimalDistance = distance;
                     var childField = fieldLook.ClosestNeighborNodeField(referenceLocation, ref minimalDistance, locationField);
                     if (childField != null)
@@ -382,37 +382,37 @@ namespace SnapTestDocuments
                 }
                 else if (String.Compare(cacheInfo.Key, cacheInfo.Value) != 0)
                 {
-                    var fieldNode = GetNearestFieldFromPosition(controlContext, lastSelect.Item1);
+                    var fieldNode = GetNearestNodeFieldFromPosition(controlContext, lastSelect.Item1);
                     switch (fieldNode.Item2)
                     {
                         case FieldLocationType.BeforeField:
-                            Field previousField = fieldNodes.GetPreviousField(fieldNode.Item1);
+                            Field previousField = fieldNodes.GetPreviousNodeField(fieldNode.Item1).Data;
                             int initialRange = sectionPart.Start.ToInt();
                             if (previousField != null)
                             {
                                 initialRange = previousField.Range.End.ToInt();
                             }
-                            var fieldPrefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, fieldNode.Item1.Range.Start.ToInt() - initialRange)), fieldNode.Item1.CodeRange.Length + 2);
+                            Field workingField = fieldNode.Item1.Data;
+                            var fieldPrefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, workingField.Range.Start.ToInt() - initialRange)), workingField.CodeRange.Length + 2);
                             fieldNodes.Last().UpdateField(fieldPrefix, null, null);
                             break;
                         case FieldLocationType.InsideField:
-                            var fieldText = new Tuple<string, int>(control.Document.GetText(fieldNode.Item1.ResultRange), 1);
+                            var fieldText = new Tuple<string, int>(control.Document.GetText(fieldNode.Item1.Data.ResultRange), 1);
                             fieldNodes.Last().UpdateField(null, fieldText, null);
                             break;
                         case FieldLocationType.AfterField:
                         default:
-                            Field nextField = fieldNodes.GetNextField(fieldNode.Item1);
+                            FieldTreeNode nextField = fieldNodes.GetNextNodeField(fieldNode.Item1);
                             int endRange = sectionPart.End.ToInt();
                             if (nextField != null)
                             {
-                                endRange = fieldNode.Item1.Range.End.ToInt();
-                                var fieldNodeElement = fieldNodes.ToNodeField(nextField);
-                                var fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(endRange, nextField.Range.Start.ToInt() - endRange)), nextField.CodeRange.Length + 2);
-                                fieldNodeElement.UpdateField(fieldprefix, null, null);
+                                endRange = fieldNode.Item1.Data.Range.End.ToInt();
+                                var fieldprefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(endRange, nextField.Data.Range.Start.ToInt() - endRange)), nextField.Data.CodeRange.Length + 2);
+                                nextField.UpdateField(fieldprefix, null, null);
                             }
                             else
                             {
-                                var fieldSuffix = new Tuple<string, int>((control.Document.GetText(control.Document.CreateRange(fieldNode.Item1.Range.End.ToInt(), endRange - fieldNode.Item1.Range.End.ToInt()))), 0);
+                                var fieldSuffix = new Tuple<string, int>((control.Document.GetText(control.Document.CreateRange(fieldNode.Item1.Data.Range.End.ToInt(), endRange - fieldNode.Item1.Data.Range.End.ToInt()))), 0);
                                 fieldNodes.Last().UpdateField(null, null, fieldSuffix);
                             }
                             break;
@@ -973,22 +973,22 @@ namespace SnapTestDocuments
             snapControl.VerticalScrollValue = -horizontalDiff;
         }
 
-        public Tuple<Field, FieldLocationType> GetNearestFieldFromPosition(ITextEditWinFormsUIContext controlContext, int snapPosition, bool fromEnd = true)
+        public Tuple<FieldTreeNode, FieldLocationType> GetNearestNodeFieldFromPosition(ITextEditWinFormsUIContext controlContext, int snapPosition, bool fromEnd = true)
         {
             _snapCtrlContext = controlContext;
-            var closestField = this.fieldNodes.GetNearestField(snapPosition, fromEnd);
-            if (PermissionManager.IsDocumentFieldEditable(closestField))
+            var closestField = this.fieldNodes.GetNearestNodeField(snapPosition, fromEnd);
+            if (PermissionManager.IsDocumentFieldEditable(closestField.Data))
             {
-                var foundField = closestField.CompareFieldRange(snapPosition);
+                var foundField = closestField.Data.CompareFieldRange(snapPosition);
                 switch (foundField)
                 {
                     case -1:
-                        return new Tuple<Field, FieldLocationType>(closestField, FieldLocationType.BeforeField);
+                        return new Tuple<FieldTreeNode, FieldLocationType>(closestField, FieldLocationType.BeforeField);
                     case 1:
-                        return new Tuple<Field, FieldLocationType>(closestField, FieldLocationType.AfterField);
+                        return new Tuple<FieldTreeNode, FieldLocationType>(closestField, FieldLocationType.AfterField);
                     case 0:
                     default:
-                        return new Tuple<Field, FieldLocationType>(closestField, FieldLocationType.InsideField);
+                        return new Tuple<FieldTreeNode, FieldLocationType>(closestField, FieldLocationType.InsideField);
 
                 }
             }

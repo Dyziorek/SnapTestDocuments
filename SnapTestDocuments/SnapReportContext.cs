@@ -370,6 +370,14 @@ namespace SnapTestDocuments
                 return managedItem;
             }
 
+
+            if (typeof(T) == typeof(IPermissionManager))
+            {
+                var pers = new SnapRangePermissionsTools();
+                manager.Set((T)(IPermissionManager)(pers));
+                return (T)(IPermissionManager)pers;
+            }
+
             return (T)(ITextEditManager)null;
         }
     }

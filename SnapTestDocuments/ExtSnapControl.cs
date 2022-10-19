@@ -121,12 +121,12 @@ namespace SnapTestDocuments
                     }
                 }
 
-                var nearField = dictationHelper.GetNearestFieldFromPosition(_currentContext, caretPos.Start.ToInt());
+                var nearField = dictationHelper.GetNearestNodeFieldFromPosition(_currentContext, caretPos.Start.ToInt());
                 if (nearField.Item1 != null)
                 {
-                    if (Math.Abs(caretPos.Start.ToInt() - nearField.Item1.ResultRange.End.ToInt()) <= 1)
+                    if (Math.Abs(caretPos.Start.ToInt() - nearField.Item1.Data.ResultRange.End.ToInt()) <= 1)
                     {
-                        var rangeToReplace = nearField.Item1.ResultRange;
+                        var rangeToReplace = nearField.Item1.Data.ResultRange;
 
                         var subDocumentUpdate = rangeToReplace.BeginUpdateDocument();
                         try

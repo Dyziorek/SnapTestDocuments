@@ -138,19 +138,19 @@ namespace SnapTestDocuments
         }
 
 
-        internal Field ClosestNeighborNodeField(int referenceLocation, ref int minimalDistance, Field locationField)
+        internal FieldTreeNode ClosestNeighborNodeField(int referenceLocation, ref int minimalDistance, Field locationField)
         {
             if (IsLeaf)
                 return null;
 
-            Field closestField = null;
+            FieldTreeNode closestField = null;
             foreach (var childEntry in Children)
             {
                 int fieldCheckPosition = childEntry.Data.ResultRange.End.ToInt();
                 var distance = Math.Abs(referenceLocation - fieldCheckPosition);
                 if (distance <= minimalDistance)
                 {
-                    closestField = childEntry.Data;
+                    closestField = childEntry;
                     minimalDistance = distance;
                 }
                 var closestChildField = childEntry.ClosestNeighborNodeField(referenceLocation, ref minimalDistance, locationField);
@@ -162,12 +162,12 @@ namespace SnapTestDocuments
             return closestField;
         }
 
-        public Field closestNextField(int selectionPosition, ref int minimalDistance)
+        public FieldTreeNode closestNextNodeField(int selectionPosition, ref int minimalDistance)
         {
             if (IsLeaf)
                 return null;
 
-            Field closestField = null;
+            FieldTreeNode closestField = null;
             foreach (var childEntry in Children)
             {
                 int fieldCheckPosition = childEntry.Data.ResultRange.End.ToInt();
@@ -175,10 +175,10 @@ namespace SnapTestDocuments
                 var distance = Math.Abs(selectionPosition - fieldCheckPosition);
                 if (distance <= minimalDistance && (selectionPosition - fieldCheckPosition) < 0)
                 {
-                    closestField = childEntry.Data;
+                    closestField = childEntry;
                     minimalDistance = distance;
                 }
-                var closestChildField = childEntry.closestNextField(selectionPosition, ref minimalDistance);
+                var closestChildField = childEntry.closestNextNodeField(selectionPosition, ref minimalDistance);
                 if (closestChildField != null)
                 {
                     closestField = closestChildField;
@@ -188,12 +188,12 @@ namespace SnapTestDocuments
         }
 
 
-        public Field closestNodeField(int selectionPosition, ref int minimalDistance, bool fromEnd)
+        public FieldTreeNode closestNodeField(int selectionPosition, ref int minimalDistance, bool fromEnd)
         {
             if (IsLeaf)
                 return null;
 
-            Field closestField = null;
+            FieldTreeNode closestField = null;
             foreach (var childEntry in Children)
             {
                 int fieldCheckPosition = childEntry.Data.ResultRange.End.ToInt();
@@ -204,7 +204,7 @@ namespace SnapTestDocuments
                 var distance = Math.Abs(selectionPosition - fieldCheckPosition);
                 if (distance <= minimalDistance)
                 {
-                    closestField = childEntry.Data;
+                    closestField = childEntry;
                     minimalDistance = distance;
                 }
                 var closestChildField = childEntry.closestNodeField(selectionPosition, ref minimalDistance, fromEnd);

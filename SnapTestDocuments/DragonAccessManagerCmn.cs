@@ -277,15 +277,15 @@ namespace SnapTestDocuments
                         }
                         if (SnapRangePermissionsTools.IsDocumentRangeEditableRange(SnapCtrl.Document, selection))
                         {
-                            var nearField = dictationHelper.GetNearestFieldFromPosition(snapCtrlCtx, selection.Start.ToInt());
+                            var nearField = dictationHelper.GetNearestNodeFieldFromPosition(snapCtrlCtx, selection.Start.ToInt());
                             if (nearField.Item1 != null)
                             {
-                                if (Math.Abs(selection.Start.ToInt() - nearField.Item1.ResultRange.End.ToInt()) <= 1)
+                                if (Math.Abs(selection.Start.ToInt() - nearField.Item1.Data.ResultRange.End.ToInt()) <= 1)
                                 {
-                                    var rangeToReplace = nearField.Item1.ResultRange;
+                                    var rangeToReplace = nearField.Item1.Data.ResultRange;
                                     if (log.IsDebugEnabled || log.IsInfoEnabled)
                                     {
-                                        log.InfoFormat("Tracked field change text is {0}", SnapCtrl.Document.GetText(nearField.Item1.ResultRange));
+                                        log.InfoFormat("Tracked field change text is {0}", SnapCtrl.Document.GetText(nearField.Item1.Data.ResultRange));
                                     }
                                     var subDocumentUpdate = rangeToReplace.BeginUpdateDocument();
                                     try
