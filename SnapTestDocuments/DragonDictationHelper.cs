@@ -119,7 +119,7 @@ namespace SnapTestDocuments
 
         public static FieldTreeNode GetPreviousNodeField(this List<FieldTreeNode> localFields, FieldTreeNode checkingField)
         {
-            if (localFields.First().Data.Equals(checkingField))
+            if (localFields.First().Data.Equals(checkingField.Data))
             {
                 return null;
             }
@@ -131,7 +131,7 @@ namespace SnapTestDocuments
             {
                 int fieldCheckPosition = fieldLook.Data.ResultRange.End.ToInt();
                 var distance = Math.Abs(selectionPosition - fieldCheckPosition);
-                if (distance < minimalDistance && !fieldLook.Data.Equals(checkingField))
+                if (distance < minimalDistance && (selectionPosition - fieldCheckPosition) > 0)
                 {
                     closestField = fieldLook;
                     minimalDistance = distance;
@@ -141,7 +141,7 @@ namespace SnapTestDocuments
                         closestField = childField;
                     }
                 }
-                else if (fieldLook.Data.Equals(checkingField))
+                else if (!fieldLook.Data.Equals(checkingField.Data))
                 {
                     return closestField;
                 }
@@ -279,6 +279,32 @@ namespace SnapTestDocuments
             }
         }
 
+        public static string DumpTextMappings(this List<Tuple<string, int>> mappings)
+        {
+            StringBuilder dumper = new StringBuilder();
+            foreach(var mapping in mappings)
+            {
+                dumper.Append("[").Append("'").Append(mapping.Item1).Append("'").Append(",").Append(mapping.Item2).Append("]").AppendLine();
+            }
+            return dumper.ToString();
+        }
+
+        public static string CompareTextMappings(this List<Tuple<string, int>> mappings , List<Tuple<string, int>> otherMapping)
+        {
+            StringBuilder dumper = new StringBuilder();
+            for (int mappingIdx = 0; mappingIdx < mappings.Count; mappingIdx++)
+            {
+                if (mappingIdx < otherMapping.Count && mappings[mappingIdx] != otherMapping[mappingIdx])
+                {
+                    DiffMatchPatchText diffMatchPatchText = new DiffMatchPatchText();
+                    string textPatch = diffMatchPatchText.patch_toText(diffMatchPatchText.patch_make(mappings[mappingIdx].Item1, otherMapping[mappingIdx].Item1));
+                    dumper.Append("Diffrence at: ").Append(mappingIdx).Append(" Patch is:'").Append(textPatch).Append("'").Append(",[")
+                        .Append(mappings[mappingIdx].Item2).Append(",").Append(otherMapping[mappingIdx].Item2).Append("]").AppendLine();
+                }
+            }
+            return dumper.ToString();
+        }
+
     }
 
     class DragonDictationHelper
@@ -377,20 +403,22 @@ namespace SnapTestDocuments
                     if (log.IsDebugEnabled)
                     {
                         log.DebugFormat("Generated string count {0} cached count {1} Equals {2}", stringParts.Count, cachedStringParts.Count, Enumerable.SequenceEqual(cachedStringParts, stringParts));
+                        log.DebugFormat("Dump Analyzed Data: \r\n {0}", stringParts.DumpTextMappings());
+                        log.DebugFormat("Dump Cached Data: \r\n {0}", cachedStringParts.DumpTextMappings());
                     }
                     MapTextPositions(stringParts, paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
                 }
-                else if (String.Compare(cacheInfo.Key, cacheInfo.Value) != 0)
+                else if (string.Compare(cacheInfo.Key, cacheInfo.Value) != 0)
                 {
                     var fieldNode = GetNearestNodeFieldFromPosition(controlContext, lastSelect.Item1);
                     switch (fieldNode.Item2)
                     {
                         case FieldLocationType.BeforeField:
-                            Field previousField = fieldNodes.GetPreviousNodeField(fieldNode.Item1).Data;
+                            FieldTreeNode previousField = fieldNodes.GetPreviousNodeField(fieldNode.Item1);
                             int initialRange = sectionPart.Start.ToInt();
                             if (previousField != null)
                             {
-                                initialRange = previousField.Range.End.ToInt();
+                                initialRange = previousField.Data.Range.End.ToInt();
                             }
                             Field workingField = fieldNode.Item1.Data;
                             var fieldPrefix = new Tuple<string, int>(control.Document.GetText(control.Document.CreateRange(initialRange, workingField.Range.Start.ToInt() - initialRange)), workingField.CodeRange.Length + 2);
@@ -420,27 +448,14 @@ namespace SnapTestDocuments
                     var updateData = fieldNodes.GetStringParts();
 
 #if DEBUG
-                    var cacheCompare = fieldNodes.IsCacheValid(sectionText, paragraphPositions);
-                    if (string.Compare(cacheInfo.Key, cacheInfo.Value) != 0)
+                    var stringParts = BuildFieldCache(fieldNodes, fieldRange, control, sectionPart);
+                    var cacheStringParts = fieldNodes.GetStringParts();
+                    if (log.IsInfoEnabled)
                     {
-                        log.DebugFormat("Invalid cache result {0}", string.Compare(cacheInfo.Key, cacheInfo.Value));
-                        string[] originalTexts = cacheInfo.Key.Split( new String[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
-                        string[] generatedTexts = cacheInfo.Value.Split(new String[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
-                        for(int textIdx = 0; textIdx < originalTexts.Length; textIdx++)
-                        {
-                            if (generatedTexts.Length > textIdx)
-                            {
-                                if (!originalTexts[textIdx].Equals(generatedTexts[textIdx]))
-                                {
-                                    log.DebugFormat("Number: {0}, Original Text '{1}', Cache Text '{2}'", textIdx, originalTexts[textIdx], generatedTexts[textIdx]);
-                                }
-                            }
-                            else
-                            {
-                                log.DebugFormat("Number: {0}, Original Text '{1}', No Cached", textIdx, originalTexts[textIdx]);
-                            }
-                        }
-                        var stringParts = BuildFieldCache(fieldNodes, fieldRange, control, sectionPart);
+                        log.InfoFormat("Generated string count {0} cached count {1} Equals {2}", stringParts.Count, cacheStringParts.Count, Enumerable.SequenceEqual(cacheStringParts, stringParts));
+                        log.InfoFormat("Dump Analyzed Data: \r\n {0}", stringParts.DumpTextMappings());
+                        log.InfoFormat("Dump Cached Data: \r\n {0}", cacheStringParts.DumpTextMappings());
+                        log.InfoFormat("Dump Comparison analysis:{0}", stringParts.CompareTextMappings(cacheStringParts));
                     }
 #endif
                     MapTextPositions(fieldNodes.GetStringParts(), paragraphPositions, sectionText, control, sectionPart.Start.ToInt());
@@ -766,9 +781,10 @@ namespace SnapTestDocuments
 
             if (log.IsInfoEnabled)
             {
-                int compOP = texControl.CompareTo(textEditImage);
-                log.InfoFormat("Comparsion sectionText:'{0}'  textParts:'{1}' - result {2}", texControl, textEditImage, compOP);
-                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", textImageSize, texControl.Length, EditMaxPos);
+                string checkImage = textEditImage.Remove(textEditImage.Length - 1);
+                int compOP = texControl.CompareTo(checkImage);
+                log.InfoFormat("Comparison sectionText:\r\n'{0}'  textParts:\r\n'{1}' - result {2}", texControl, checkImage, compOP);
+                log.InfoFormat("length sectionTextParts:{0}  texFromRange:{1}, maxEditPos {2}", checkImage.Length, texControl.Length, EditMaxPos);
             }
 
             if (log.IsDebugEnabled)
