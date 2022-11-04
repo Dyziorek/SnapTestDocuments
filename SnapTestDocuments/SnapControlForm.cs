@@ -36,7 +36,7 @@ namespace SnapTestDocuments
             log4net.Config.XmlConfigurator.Configure(new FileInfo(string.Format("{0}.config", @"C:\Users\ddus\source\repos\SnapTestDocuments\SnapTestDocuments\bin\Deploy\log4net")));
             //string fx = "The quick brown fox jumps over lazy";
             //string fxc = "The brown fox jumps over lazy";
-            snapControl2.SetContext = new SimpleSnapContextImpl();
+            snapControl2.SetContext = new SimpleSnapContextImpl(snapControl2);
             //DiffMatchPatchText matchPatchText = new DiffMatchPatchText();
             //var differ = matchPatchText.diff_main(fx, fxc);
             //var deltat = matchPatchText.diff_toDelta(differ);
@@ -311,15 +311,26 @@ namespace SnapTestDocuments
 
             if (rootData.Level == log4net.Core.Level.Debug)
             {
-                rootData.Level = log4net.Core.Level.Info;
+                rootData.Level = log4net.Core.Level.Verbose;
+                ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
+                button1.Text = "Log (" + rootData.Level.Name.Substring(0,4) + ")";
+                return;
             }
-            else
+            if (rootData.Level == log4net.Core.Level.Info)
             {
                 rootData.Level = log4net.Core.Level.Debug;
+                ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
+                button1.Text = "Log (" + rootData.Level.Name.Substring(0, 4) + ")";
+                return;
             }
-
+            if (rootData.Level == log4net.Core.Level.Verbose)
+            {
+                rootData.Level = log4net.Core.Level.Info;
+            }
+                       
             ((log4net.Repository.Hierarchy.Hierarchy)log4net.LogManager.GetRepository()).RaiseConfigurationChanged(EventArgs.Empty);
-            button1.Text = "Log (" + rootData.Level.Name + ")";
+            button1.Text = "Log (" + rootData.Level.Name.Substring(0, 4) + ")";
+
         }
 
         private void buttonDumo_Click(object sender, EventArgs e)

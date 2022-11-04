@@ -20,6 +20,7 @@ namespace SnapTestDocuments
         private string cacheStringText = null;
         private string lastCachedText = null;
         private int lastCachedTextLength = 0;
+        private int _canProcessDictMessage = 0;
         private DocumentEntityBase currentSectionElement;
         private bool DirtySectionTextMapping = true;
 
@@ -342,7 +343,7 @@ namespace SnapTestDocuments
         {
 
             log.InfoFormat("SetSel params: begin:{0}, end:{1}", start, end);
-            if (currentSelectedInterp != null)
+            if (currentSelectedInterp != null && CanProcessDictMessages)
             {
                 if (currentSectionField != null && SnapFieldTools.IsValidField(currentSectionField.Field))
                 {
@@ -487,6 +488,22 @@ namespace SnapTestDocuments
         {
             snapCtrlCtx.SnapControl.ContentChanged -= DragonAccessManagerCmn_ContentChanged;
             snapCtrlCtx.SnapControl.SelectionChanged -= DragonAccessManagerCmn_SelectionChanged;
+        }
+
+        public void LockDictation()
+        {
+            _canProcessDictMessage++;
+        }
+        public void UnlockDication()
+        {
+            _canProcessDictMessage--;
+        }
+        private bool CanProcessDictMessages
+        {
+            get
+            {
+                return _canProcessDictMessage == 0;
+            }
         }
 
         public int SnapFromEdit(int editPos)

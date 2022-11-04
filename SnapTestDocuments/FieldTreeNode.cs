@@ -131,7 +131,18 @@ namespace SnapTestDocuments
         {
             if (FieldPrefix != null) 
                 yield return FieldPrefix;
-            if (FieldText != null)
+
+            if (AllChildren.Count > 0)
+            {
+                foreach(var childItem in AllChildren)
+                {
+                    foreach(var childTextItem in childItem.GetCachedStringData())
+                    {
+                        yield return childTextItem;
+                    }
+                }
+            }
+            else if (FieldText != null)
                 yield return FieldText;
             if (FieldSuffix != null)
                 yield return FieldSuffix;

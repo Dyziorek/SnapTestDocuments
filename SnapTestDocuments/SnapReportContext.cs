@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using TextEditor.Core.API;
 using DevExpress.XtraRichEdit.Services;
+using log4net;
 
 namespace TextEditor.Core.API
 {
@@ -66,7 +67,37 @@ namespace SnapTestDocuments
         }
     }
 
-    
+
+    public static class ILogExtentions
+    {
+        public static void Trace(this ILog log, string message, Exception exception)
+        {
+            log.Logger.Log(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType,
+                log4net.Core.Level.Trace, message, exception);
+        }
+
+        public static void Trace(this ILog log, string message)
+        {
+            log.Trace(message, null);
+        }
+
+        public static void Verbose(this ILog log, string message, Exception exception)
+        {
+            log.Logger.Log(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType,
+                log4net.Core.Level.Verbose, message, exception);
+        }
+
+        public static void Verbose(this ILog log, string message)
+        {
+            log.Verbose(message, null);
+        }
+
+        public static bool IsVerboseEnabled(this ILog log)
+        {
+            return log?.Logger.IsEnabledFor(log4net.Core.Level.Verbose) == true;
+        }
+
+    }
 
     public interface ITextFieldInfo
     {
@@ -145,7 +176,8 @@ namespace SnapTestDocuments
         Rectangle PosFromChar(int charPos);
         int CharFromPos(PointF charPos);
 
-
+        void LockDictation();
+        void UnlockDication();
 
         void UpdateSelectedItem(DocumentEntityBase selectedItem);
         bool HasSections();
@@ -194,8 +226,8 @@ namespace SnapTestDocuments
         {
             workTracker = worker;
         }
-        public bool IsCaretPosInField => workTracker.Document.Fields.Any(checkCursor => checkCursor.Range.Start.ToInt() > workTracker.Document.CaretPosition.ToInt() &&
-       checkCursor.Range.End.ToInt() < workTracker.Document.CaretPosition.ToInt());
+        public bool IsCaretPosInField => workTracker.Document.Fields.Any(checkCursor => checkCursor.Range.Start.ToInt() >= workTracker.Document.CaretPosition.ToInt() &&
+       checkCursor.Range.End.ToInt() <= workTracker.Document.CaretPosition.ToInt());
     }
 
     public class SelectionChangedTrackingManagerImpl : ISelectionChangedTrackingManager
@@ -354,6 +386,7 @@ namespace SnapTestDocuments
         public SnapControlForm FormControl { get; set; }
         SnapManagerContainer<ITextEditManager> manager = new SnapTestDocuments.SnapManagerContainer<ITextEditManager>();
 
+        ISelectionChangedTrackingManager tracker;
         public SnapControl SnapControl => WorkControl;
 
         public SnapDocument SnapDocument => WorkControl.Document;
@@ -361,6 +394,11 @@ namespace SnapTestDocuments
         public SnapControlForm MainForm => FormControl;
 
         public SnapDocument Document => WorkControl.Document;
+
+        public SimpleSnapContextImpl(SnapControl baseControl)
+        {
+            WorkControl = baseControl;
+        }
 
         public T GetManager<T>() where T : ITextEditManager
         {
@@ -376,6 +414,16 @@ namespace SnapTestDocuments
                 var pers = new SnapRangePermissionsTools();
                 manager.Set((T)(IPermissionManager)(pers));
                 return (T)(IPermissionManager)pers;
+            }
+
+            if (typeof(T) == typeof(ISelectionChangedTrackingManager))
+            {
+                if (tracker == null)
+                {
+                    tracker = new SelectionChangedTrackingManagerImpl(this);
+                    manager.Set<T>((T)(ISelectionChangedTrackingManager)(tracker));
+                    return (T)(ISelectionChangedTrackingManager)tracker;
+                }
             }
 
             return (T)(ITextEditManager)null;
